@@ -1,24 +1,35 @@
-# 📱 Nome do Projeto
+# 📱 EcoLog Mobile – Aplicativo Logístico Sustentável com IA
 
-## 🧩 Problema
-O projeto foi desenvolvido para solucionar o problema de (descrever a situação-problema do grupo).
-
-Exemplo:
-Falta de organização de informações e baixa eficiência no gerenciamento de dados no contexto de (academia, supermercado, empresa, etc).
-
-## 👥 Público-Alvo
-- Usuários do sistema
-- Funcionários
-- Administradores
-- Comunidade local (se for social)
+## 📌 Problema
+A falta de monitoramento inteligente em operações logísticas e de pesagem rodoviária gera filas de caminhões, desperdício de combustível, aumento da emissão de gases poluentes e baixa eficiência operacional, impactando negativamente o meio ambiente e a gestão de recursos.
 
 ## 🎯 Objetivo
-Desenvolver um aplicativo que utilize tecnologia para melhorar a gestão, organização e tomada de decisões, gerando impacto social e tecnológico.
+Desenvolver um aplicativo móvel integrado à Inteligência Artificial capaz de monitorar dados logísticos em tempo real, analisar padrões de movimentação e gerar recomendações sustentáveis que auxiliem na redução de desperdícios e na otimização de processos.
 
-## 🛠️ Tecnologias Utilizadas (protótipo)
-- Figma (Interface)
-- GitHub (Versionamento)
-- Futuro: Node.js / Banco de Dados / IA (se aplicável)
+## 👥 Público-Alvo
+- Empresas logísticas
+- Operadores de balança rodoviária
+- Gestores de transporte
+- Setor agropecuário e industrial
 
-## 📌 Status do Projeto
-🚧 Em fase de prototipação e planejamento
+## 🌱 Alinhamento com Sustentabilidade (ODS)
+O projeto está alinhado com:
+- ODS 9: Indústria, Inovação e Infraestrutura
+- ODS 12: Consumo e Produção Responsáveis
+- ODS 13: Ação Contra a Mudança Global do Clima
+
+## 🤖 Uso de Inteligência Artificial
+A IA será utilizada para:
+- Análise de dados logísticos
+- Previsão de fluxo de veículos
+- Geração de insights sustentáveis
+- Recomendações inteligentes para redução de impactos ambientais
+
+## 🏗️ Estrutura do Projeto
+- /docs → Documentação técnica
+- /mobile → Aplicativo móvel
+- /backend → API do sistema
+- /ia → Módulo de Inteligência Artificial
+
+## 🚀 Status do Projeto
+Em fase de planejamento e engenharia de software.
