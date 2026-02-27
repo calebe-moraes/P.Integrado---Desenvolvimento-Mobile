@@ -1,5 +1,3 @@
----
-
 #  STOX
 
 ### Intelligent Inventory Management Platform
