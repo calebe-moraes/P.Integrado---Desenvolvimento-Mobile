@@ -1,12 +1,37 @@
 ---
-name: Bug Report
-about: Reportar problema
+name:  Bug Report
+about: Reportar falha ou comportamento inesperado
+title: "[BUG] "
+labels: bug
+assignees: ''
 ---
 
-## Descrição do Bug
+##  Descrição do Problema
+Descreva claramente o erro encontrado.
 
-## Passos para Reproduzir
+##  Passos para Reproduzir
+1. 
+2. 
+3. 
 
-## Resultado Esperado
+##  Comportamento Esperado
+Explique o que deveria acontecer.
 
-## Evidências (prints/logs)
+##  Comportamento Atual
+Explique o que está acontecendo.
+
+##  Ambiente
+- Ambiente: (Dev / Homologação)
+- SAP B1 Version:
+- Service Layer:
+- Banco de Dados:
+- Navegador / Dispositivo:
+
+##  Evidências
+Logs, prints ou payload da API.
+
+##  Severidade
+- [ ] Baixa
+- [ ] Média
+- [ ] Alta
+- [ ] Crítica
