@@ -1,0 +1,34 @@
+@startuml
+title STOX - Sistema de Contagem Inteligente de Estoque
+
+actor Usuario
+actor "SAP Business One" as SAP
+actor "Motor de IA (YOLO)" as IA
+
+rectangle Sistema {
+
+Usuario --> (Realizar Login)
+
+Usuario --> (Sincronizar Produtos)
+
+Usuario --> (Escanear Codigo de Barras)
+
+Usuario --> (Capturar Imagem)
+
+Usuario --> (Registrar Contagem)
+
+Usuario --> (Gerar Relatorio)
+
+(Capturar Imagem) --> (Processar Contagem com IA)
+
+(Processar Contagem com IA) --> IA
+
+(Sincronizar Produtos) --> SAP
+
+(Registrar Contagem) --> (Atualizar Estoque no SAP)
+
+(Atualizar Estoque no SAP) --> SAP
+
+}
+
+@enduml

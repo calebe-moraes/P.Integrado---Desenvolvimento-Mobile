@@ -1,0 +1,38 @@
+@startuml
+title STOX - Caso de Uso → User Stories → MVP
+
+rectangle "Caso de Uso" {
+  (Contagem de Estoque)
+}
+
+rectangle "User Stories - MVP" {
+  (US01 Login)
+  (US02 Escanear Produto)
+  (US03 Capturar Imagem)
+  (US04 Confirmar Contagem)
+  (US05 Sincronizar SAP)
+}
+
+rectangle "User Stories - Pós-MVP" {
+  (US06 Relatorios)
+  (US07 Detectar Divergencias)
+  (US08 Dashboard)
+  (US09 Historico)
+  (US10 Sugestao de Reposicao)
+}
+
+rectangle "MVP" {
+  (US01)
+  (US02)
+  (US03)
+  (US04)
+  (US05)
+}
+
+(Contagem de Estoque) --> (US01 Login)
+(Contagem de Estoque) --> (US02 Escanear Produto)
+(Contagem de Estoque) --> (US03 Capturar Imagem)
+(Contagem de Estoque) --> (US04 Confirmar Contagem)
+(Contagem de Estoque) --> (US05 Sincronizar SAP)
+
+@enduml
