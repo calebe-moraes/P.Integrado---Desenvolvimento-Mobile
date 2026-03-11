@@ -113,9 +113,9 @@ class _LoginPageState extends State<LoginPage> {
                       // Campos de Texto
                       TextField(
                         controller: _usuarioController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: "Usuário",
-                          prefixIcon: const Icon(Icons.person_outline),
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
                       ),
                       const SizedBox(height: 20),

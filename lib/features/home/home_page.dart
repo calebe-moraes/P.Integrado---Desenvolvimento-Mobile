@@ -37,7 +37,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _tocarFeedback(String assetPath, {bool isError = false}) async {
     try {
-      if (await Vibration.hasVibrator() ?? false) {
+      if (await Vibration.hasVibrator()) {
         if (isError) {
           Vibration.vibrate(pattern: [0, 200, 100, 400]);
         } else {
@@ -61,7 +61,10 @@ class _HomePageState extends State<HomePage> {
         await _carregarDadosLocais();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sincronização concluída!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Sincronização concluída!'),
+            backgroundColor: Colors.green,
+          ),
         );
       } else {
         await _tocarFeedback('sounds/fail.mp3', isError: true);
@@ -80,7 +83,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _exibirErroSap(String mensagemBruta) {
-    bool isItemDuplicado = mensagemBruta.contains("-1310") ||
+    bool isItemDuplicado =
+        mensagemBruta.contains("-1310") ||
         mensagemBruta.contains("1470000497") ||
         mensagemBruta.toLowerCase().contains("already");
 
@@ -100,8 +104,12 @@ class _HomePageState extends State<HomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: Row(
           children: [
-            Icon(isItemDuplicado ? Icons.warning_amber_rounded : Icons.error_outline,
-                color: isItemDuplicado ? Colors.orange : Colors.red),
+            Icon(
+              isItemDuplicado
+                  ? Icons.warning_amber_rounded
+                  : Icons.error_outline,
+              color: isItemDuplicado ? Colors.orange : Colors.red,
+            ),
             const SizedBox(width: 10),
             Text(isItemDuplicado ? "Conflito de Itens" : "Erro na API"),
           ],
@@ -111,19 +119,34 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Problema na sincronização:", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                "Problema na sincronização:",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
-              Text(isItemDuplicado
-                  ? "O SAP informou que o fardo ${itemEncontrado.isNotEmpty ? itemEncontrado : 'selecionado'} já possui uma contagem aberta."
-                  : "Ocorreu um erro ao processar os dados no SAP."),
+              Text(
+                isItemDuplicado
+                    ? "O SAP informou que o item ${itemEncontrado.isNotEmpty ? itemEncontrado : 'selecionado'} já possui uma contagem aberta."
+                    : "Ocorreu um erro ao processar os dados no SAP.",
+              ),
               const SizedBox(height: 20),
               const Divider(),
-              Text(mensagemBruta, style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.blueGrey)),
+              Text(
+                mensagemBruta,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  color: Colors.blueGrey,
+                ),
+              ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("ENTENDI")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("ENTENDI"),
+          ),
         ],
       ),
     );
@@ -139,7 +162,10 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           actions: [
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _carregarDadosLocais),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _carregarDadosLocais,
+            ),
           ],
         ),
         drawer: _buildDrawer(),
@@ -167,10 +193,17 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
         children: [
-          const Text("Fardos aguardando envio", style: TextStyle(color: Colors.white70)),
+          const Text(
+            "Itens aguardando envio",
+            style: TextStyle(color: Colors.white70),
+          ),
           Text(
             "${_contagensOffline.length}",
-            style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 42,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 16),
           // Botão de Sincronizar com largura adaptável
@@ -180,15 +213,26 @@ class _HomePageState extends State<HomePage> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _carregando || _contagensOffline.isEmpty ? null : _sincronizarComSAP,
-                icon: _carregando 
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.cloud_upload),
+                onPressed: _carregando || _contagensOffline.isEmpty
+                    ? null
+                    : _sincronizarComSAP,
+                icon: _carregando
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.cloud_upload),
                 label: const Text("SINCRONIZAR AGORA"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green, 
+                  backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -200,7 +244,12 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildContagensList() {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Padding inferior para não colar na base
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        80,
+      ), // Padding inferior para não colar na base
       itemCount: _contagensOffline.length,
       itemBuilder: (context, index) {
         final item = _contagensOffline[index];
@@ -208,7 +257,10 @@ class _HomePageState extends State<HomePage> {
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: Icon(Icons.inventory_2, color: primaryColor),
-            title: Text("${item['itemCode']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              "${item['itemCode']}",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             subtitle: Text("Quantidade: ${item['quantidade']}"),
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
@@ -229,7 +281,10 @@ class _HomePageState extends State<HomePage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.cloud_done_outlined, size: 64, color: Colors.grey),
-          Text("Tudo em dia!", style: TextStyle(fontSize: 18, color: Colors.grey)),
+          Text(
+            "Tudo em dia!",
+            style: TextStyle(fontSize: 18, color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -241,7 +296,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(color: primaryColor),
-            currentAccountPicture: const CircleAvatar(backgroundColor: Colors.white, child: Icon(Icons.person, size: 40)),
+            currentAccountPicture: const CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person, size: 40),
+            ),
             accountName: const Text("Operador STOX"),
             accountEmail: const Text("SAP Business One Conectado"),
           ),
@@ -253,8 +311,12 @@ class _HomePageState extends State<HomePage> {
                   title: const Text("Nova Contagem Offline"),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ContadorOfflinePage()))
-                        .then((_) => _carregarDadosLocais());
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ContadorOfflinePage(),
+                      ),
+                    ).then((_) => _carregarDadosLocais());
                   },
                 ),
                 ListTile(
@@ -262,7 +324,10 @@ class _HomePageState extends State<HomePage> {
                   title: const Text("Pesquisar Item SAP"),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ItemSearchPage()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ItemSearchPage()),
+                    );
                   },
                 ),
                 const Divider(),
@@ -271,7 +336,10 @@ class _HomePageState extends State<HomePage> {
                   title: const Text("Configurações API"),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiConfigPage()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ApiConfigPage()),
+                    );
                   },
                 ),
               ],
@@ -284,7 +352,11 @@ class _HomePageState extends State<HomePage> {
             onTap: () async {
               await SapService.logout();
               if (!mounted) return;
-              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (r) => false);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (r) => false,
+              );
             },
           ),
           const SizedBox(height: 20),

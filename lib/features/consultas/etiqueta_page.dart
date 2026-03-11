@@ -125,6 +125,7 @@ class _EtiquetaPageState extends State<EtiquetaPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
+        // ignore: deprecated_member_use
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
       ),
       child: Row(
