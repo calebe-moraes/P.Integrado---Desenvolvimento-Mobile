@@ -1,0 +1,58 @@
+https://barcode-maker.com/pt/Code128
+
+
+ItemCode	ItemName
+A00001	J.B. Impressora Officeprint 1420
+A00002	J.B. Impressora Officeprint 1111
+A00003	J.B. Impressora Officeprint 1186
+A00004	Rainbow Color Printer 5.0
+A00005	Rainbow Color Printer 7.5
+A00006	Rainbow 1200 Laser Series
+B10000	Impressora de etiquetas
+C00001	Motherboard BTX
+C00002	Motherboard MicroATX
+C00003	Quadcore CPU 3.4 GHz
+C00004	CPU Torre com alimentação
+C00005	WLAN Card
+C00006	Gigabit Network Card
+C00007	Hard Disk 3TB
+C00008	Computer Monitor 24" HDMI
+C00009	Keyboard Comfort USB
+C00010	Mouse USB
+C00011	Memoria DDR RAM 8GB
+C00012	Gabinete para HD externo
+C00013	Disco 1 TB para HD externo
+C00014	Case para Laptop
+D00001	Portable Hard Disk 1TB
+D00002	Portable Hard Disk 2TB
+E00001	Tablets (Secondhand)
+I00001	Blu-Ray Disc 10-Pack
+I00002	Blu-Ray DL Disc 10-Pack
+I00003	USB Flashdrive 128GB
+I00004	USB Flashdrive 256GB
+I00005	J.B. Laptop Serie X1
+I00006	J.B. Laptop Serie X2
+I00007	Rainbow Impressora 9.5 Inkjet Cartridge
+I00008	Rainbow Impressora Ink 6-Pack and Photo Paper Kit
+L10001	Horas de Produção
+LB0001	Mão de Obra - Diário
+LB0002	Mão de Obra - Por Hora
+LM4029	LeMon 4029 Impressora
+LM4029ACA	LeMon 4029 AC Adaptador energia
+LM4029APCD	LeMon 4029 AC Cabo Adaptador
+LM4029D	LeMon 4029 Bandeja 500 folhas
+LM4029MC	Chip de Memória
+LM4029PH	LeMon 4029 Rolamento da impressora
+LM4029PS	LeMon 4029 Fonte de energia
+LM4029SB	LeMon 4029 System Board
+P10001	PC - 8x Core DDR 32GB 2TB HDD
+P10002	PC - 12x Core DDR 64GB 5x150 GB SSD
+P10003	PC Set 1
+P10004	PC Set 2
+P20001	Servidor 4GB Memoria
+P20002	Servidor 32GB Memoria
+P20003	HD Externo
+S10000	Server Point 10000
+TR0001	Despesas de Viagens
+Z00001	Tablet PC 64GB Black
+Z00002	Tablet PC 64GB White
