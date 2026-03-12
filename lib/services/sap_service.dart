@@ -29,7 +29,7 @@ class SapService {
   }
 
   // ==========================================
-  // MÉTODOS DE AUTENTICAÇÃO
+  // MÉTODOS DE AUTENTICAÇÃO E USUÁRIO
   // ==========================================
 
   static Future<bool> login({required String usuario, required String senha}) async {
@@ -70,6 +70,13 @@ class SapService {
             await prefs.setString('ROUTEID', routeIdMatch.group(1)!);
           }
         }
+
+        // --- NOVO: BUSCA E SALVA O NOME DO OPERADOR ---
+        final nomeOperador = await getNomeOperador(usuario);
+        // Se encontrar o nome usa ele, se não achar, usa o próprio código de usuário como fallback
+        await prefs.setString('UserName', nomeOperador ?? usuario);
+        // ----------------------------------------------
+
         return true;
       }
       return false;
@@ -79,6 +86,46 @@ class SapService {
     } finally {
       client?.close(); // Essencial para evitar vazamento de sockets em produção
     }
+  }
+
+  static Future<String?> getNomeOperador(String userCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    final baseUrl = prefs.getString('sap_url');
+    final session = prefs.getString('B1SESSION');
+    final routeId = prefs.getString('ROUTEID');
+
+    if (baseUrl == null || session == null || baseUrl.isEmpty) return null;
+
+    http.Client? client;
+    try {
+      client = await _getClient();
+      final cleanCode = userCode.trim().replaceAll("'", "''");
+      final filter = "\$filter=UserCode eq '$cleanCode'";
+      final fullUri = Uri.parse("${_prepareUrl(baseUrl)}Users?\$select=UserName&$filter");
+
+      final cookieHeader = "B1SESSION=$session${routeId != null ? '; ROUTEID=$routeId' : ''}";
+
+      final response = await client.get(
+        fullUri,
+        headers: {
+          "Cookie": cookieHeader,
+          "Accept": "application/json",
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List dinamicList = data['value'] ?? [];
+        if (dinamicList.isNotEmpty) {
+          return dinamicList.first['UserName'];
+        }
+      }
+    } catch (e) {
+      debugPrint("💥 Erro ao buscar nome do operador: $e");
+    } finally {
+      client?.close();
+    }
+    return null;
   }
 
   static Future<void> logout() async {
@@ -103,6 +150,7 @@ class SapService {
     
     await prefs.remove('B1SESSION');
     await prefs.remove('ROUTEID');
+    await prefs.remove('UserName'); // Remove o nome ao deslogar
   }
 
   // ==========================================

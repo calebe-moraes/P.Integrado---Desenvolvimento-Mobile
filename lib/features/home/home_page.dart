@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import necessário
 import 'package:vibration/vibration.dart';
 import '../../db/database_helper.dart';
 import '../../services/sap_service.dart';
@@ -19,18 +20,36 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _contagensOffline = [];
   bool _carregando = false;
+  String _nomeOperador = "Operador..."; // Variável de estado para o nome
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
-    _carregarDadosLocais();
+    _carregarDadosIniciais();
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  // Busca tanto as contagens quanto as infos do usuário
+  Future<void> _carregarDadosIniciais() async {
+    await Future.wait([
+      _carregarDadosLocais(),
+      _carregarUsuario(),
+    ]);
+  }
+
+  Future<void> _carregarUsuario() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _nomeOperador = prefs.getString('UserName') ?? "Operador STOX";
+      });
+    }
   }
 
   Future<void> _carregarDadosLocais() async {
@@ -216,8 +235,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // CORREÇÃO: O Scaffold fica na raiz e a SafeArea protege apenas o corpo (body).
-    // Isso evita o corte visual superior, preenchendo a barra de status com a cor do AppBar.
     return Scaffold(
       appBar: AppBar(
         title: const Text("Painel STOX", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -254,7 +271,6 @@ class _HomePageState extends State<HomePage> {
     
     return Container(
       width: double.infinity,
-      // Padding flexível para evitar cortes (removido o limite rígido de altura)
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
       decoration: BoxDecoration(
         color: theme.primaryColor,
@@ -269,7 +285,7 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min, // Garante que a coluna ocupe apenas o espaço necessário
+        mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
             "Itens aguardando envio",
@@ -286,7 +302,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 24),
-          // Botão adaptado para preencher de forma segura e responsiva
           SizedBox(
             width: double.infinity,
             height: 54,
@@ -319,7 +334,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildContagensList() {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 80), // Padding extra no fundo para a navegação segura
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 80),
       itemCount: _contagensOffline.length,
       itemBuilder: (context, index) {
         final item = _contagensOffline[index];
@@ -400,7 +415,7 @@ class _HomePageState extends State<HomePage> {
               backgroundColor: Colors.white,
               child: Icon(Icons.person_rounded, size: 40, color: Colors.grey),
             ),
-            accountName: const Text("Operador STOX", style: TextStyle(fontWeight: FontWeight.bold)),
+            accountName: Text(_nomeOperador, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), // <<< AQUI ESTÁ O NOME DINÂMICO
             accountEmail: const Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.greenAccent, size: 14),
@@ -473,7 +488,7 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          const SizedBox(height: 24), // Área segura na base do drawer
+          const SizedBox(height: 24),
         ],
       ),
     );
