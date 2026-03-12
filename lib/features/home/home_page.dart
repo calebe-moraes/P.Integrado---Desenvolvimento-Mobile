@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _tocarFeedback(String assetPath, {bool isError = false}) async {
     try {
-      if (await Vibration.hasVibrator() ?? false) {
+      if (await Vibration.hasVibrator()) {
         if (isError) {
           Vibration.vibrate(pattern: [0, 200, 100, 400]);
         } else {
@@ -261,6 +261,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: theme.primaryColor.withOpacity(0.3), 
             blurRadius: 12, 
             offset: const Offset(0, 6)
@@ -332,6 +333,7 @@ class _HomePageState extends State<HomePage> {
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             leading: CircleAvatar(
+              // ignore: deprecated_member_use
               backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
               radius: 22,
               child: Icon(Icons.inventory_2_rounded, color: Theme.of(context).primaryColor, size: 22),

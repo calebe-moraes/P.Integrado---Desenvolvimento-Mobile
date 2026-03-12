@@ -39,7 +39,7 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
 
   Future<void> _tocarFeedback(String assetPath, {bool isError = false}) async {
     try {
-      if (await Vibration.hasVibrator() ?? false) {
+      if (await Vibration.hasVibrator()) {
         if (isError) {
           Vibration.vibrate(pattern: [0, 200, 100, 300]);
         } else {
@@ -232,6 +232,7 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                               await _tocarFeedback('sounds/beep.mp3');
                               if (!mounted) return;
                               _searchController.text = code;
+                              // ignore: use_build_context_synchronously
                               Navigator.of(context).pop();
                               _buscar();
                             }
@@ -240,6 +241,7 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                       ),
                       // Overlay do Scanner (Visual)
                       ColorFiltered(
+                        // ignore: deprecated_member_use
                         colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.7), BlendMode.srcOut),
                         child: Stack(
                           children: [

@@ -33,7 +33,7 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
 
   Future<void> _tocarFeedback(String assetPath, {bool isError = false}) async {
     try {
-      if (await Vibration.hasVibrator() ?? false) {
+      if (await Vibration.hasVibrator()) {
         if (isError) {
           Vibration.vibrate(pattern: [0, 200, 100, 300]);
         } else {
@@ -171,6 +171,7 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
                               
                               if (!mounted) return;
                               _codigoController.text = code;
+                              // ignore: use_build_context_synchronously
                               Navigator.of(context).pop();
                               _focusNodeCodigo.nextFocus();
                             }
@@ -178,6 +179,7 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
                         ),
                       ),
                       ColorFiltered(
+                        // ignore: deprecated_member_use
                         colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.7), BlendMode.srcOut),
                         child: Stack(
                           children: [
@@ -337,6 +339,7 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
                 await DatabaseHelper.instance.atualizarContagem(item['id'], novaQtd);
                 if (mounted) {
                   HapticFeedback.heavyImpact();
+                  // ignore: use_build_context_synchronously
                   Navigator.pop(context);
                   setState(() {});
                   _mostrarMensagem('Quantidade atualizada!', isSuccess: true);
@@ -384,6 +387,7 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
               await DatabaseHelper.instance.excluirContagem(id);
               if (mounted) {
                 HapticFeedback.heavyImpact();
+                // ignore: use_build_context_synchronously
                 Navigator.pop(context);
                 setState(() {});
                 _mostrarMensagem('Registro removido com sucesso.', isSuccess: true);

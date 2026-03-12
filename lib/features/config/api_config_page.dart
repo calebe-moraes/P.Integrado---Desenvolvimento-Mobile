@@ -128,6 +128,7 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   value: _permitirSslInseguro,
+                  // ignore: deprecated_member_use
                   activeColor: primaryColor,
                   onChanged: (bool value) {
                     HapticFeedback.selectionClick();
