@@ -151,6 +151,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
+    // ── Contagem já aberta ──────────────────────────────────────────────────
     if (mensagemBruta.contains('-1310') ||
         mensagemBruta.contains('1470000497') ||
         msg.contains('ALREADY')) {
@@ -166,9 +167,36 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    if (msg.contains('WAREHOUSE') ||
-        msg.contains('WAREHOUSECODE') ||
-        msg.contains('-5002')) {
+    // ── Item não encontrado — VERIFICADO ANTES do depósito ──────────────────
+    // O SAP pode retornar mensagens com "WAREHOUSE" mesmo quando o problema
+    // real é o código do item inexistente no cadastro. Verificar item primeiro
+    // evita classificar errado e confundir o operador.
+    if (msg.contains('-4002') ||
+        msg.contains('ITEM NOT FOUND') ||
+        msg.contains('INVALID ITEM') ||
+        msg.contains('ITEM CODE') ||
+        (msg.contains('ITEM') && msg.contains('NOT FOUND')) ||
+        (msg.contains('ITEM') && msg.contains('DOES NOT EXIST')) ||
+        (msg.contains('ITEM') && msg.contains('INVALID'))) {
+      return _ErroSap(
+        icone: Icons.inventory_2_rounded,
+        cor: Colors.orange.shade700,
+        titulo: 'Item não encontrado no SAP',
+        mensagem: itemEncontrado.isNotEmpty
+            ? 'O item "$itemEncontrado" não foi encontrado no cadastro do SAP Business One. Verifique se o código está correto.'
+            : 'Um dos itens da contagem não existe no cadastro do SAP Business One.',
+        orientacao:
+            'Confirme o código do item diretamente no SAP Business One → Estoque → Dados do Item, e corrija a contagem antes de sincronizar novamente.',
+      );
+    }
+
+    // ── Depósito inválido ────────────────────────────────────────────────────
+    if (msg.contains('-5002') ||
+        msg.contains('WAREHOUSE NOT FOUND') ||
+        msg.contains('INVALID WAREHOUSE') ||
+        (msg.contains('WAREHOUSE') && msg.contains('NOT FOUND')) ||
+        (msg.contains('WAREHOUSE') && msg.contains('INVALID')) ||
+        (msg.contains('WAREHOUSECODE') && msg.contains('NOT FOUND'))) {
       return _ErroSap(
         icone: Icons.warehouse_rounded,
         cor: Colors.orange.shade700,
@@ -178,20 +206,6 @@ class _HomePageState extends State<HomePage> {
             : 'Um dos depósitos informados não existe no SAP Business One.',
         orientacao:
             'Verifique o código do depósito nas Configurações da API ou edite as contagens com o código correto.',
-      );
-    }
-
-    if (msg.contains('ITEM') &&
-        (msg.contains('NOT FOUND') || msg.contains('-4002'))) {
-      return _ErroSap(
-        icone: Icons.inventory_2_rounded,
-        cor: Colors.orange.shade700,
-        titulo: 'Item não encontrado',
-        mensagem: itemEncontrado.isNotEmpty
-            ? 'O item "$itemEncontrado" não foi encontrado no cadastro do SAP Business One.'
-            : 'Um dos itens da contagem não existe no cadastro do SAP Business One.',
-        orientacao:
-            'Verifique se o código do item está correto e se ele está cadastrado na base do SAP.',
       );
     }
 
