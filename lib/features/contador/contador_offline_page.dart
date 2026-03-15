@@ -709,9 +709,6 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
     );
   }
 
-  // ─── EXCLUSÃO SIMPLES (long press individual) ─────────────────────────────
-
-
   void _mostrarMensagem(
     String msg, {
     bool isError = false,
@@ -915,15 +912,32 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
         ),
 
         // FAB de excluir aparece apenas no modo seleção
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         floatingActionButton: _modoSelecao && _selecionados.isNotEmpty
-            ? FloatingActionButton.extended(
-                onPressed: _excluirSelecionados,
-                backgroundColor: Colors.red.shade600,
-                foregroundColor: Colors.white,
-                icon: const Icon(Icons.delete_rounded),
-                label: Text(
-                  'Excluir ${_selecionados.length}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _excluirSelecionados,
+                    icon: const Icon(Icons.delete_rounded),
+                    label: Text(
+                      'Excluir ${_selecionados.length} ${_selecionados.length == 1 ? "item" : "itens"}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
               )
             : null,
