@@ -38,8 +38,6 @@ class _EtiquetaPageState extends State<EtiquetaPage>
   late TextEditingController _cab1Controller;
   late TextEditingController _cab2Controller;
   late TextEditingController _rodapeController;
-  late TextEditingController _larguraController;
-  late TextEditingController _alturaController;
   late TextEditingController _copiasController;
 
   bool get _isLote => widget.itenslote != null && widget.itenslote!.isNotEmpty;
@@ -60,8 +58,6 @@ class _EtiquetaPageState extends State<EtiquetaPage>
     _cab1Controller.dispose();
     _cab2Controller.dispose();
     _rodapeController.dispose();
-    _larguraController.dispose();
-    _alturaController.dispose();
     _copiasController.dispose();
     _audio.dispose();
     super.dispose();
@@ -69,7 +65,8 @@ class _EtiquetaPageState extends State<EtiquetaPage>
 
   // ─── FEEDBACK ────────────────────────────────────────────────────────────
 
-  Future<void> _play(String asset, {bool isError = false, bool isFail = false}) async {
+  Future<void> _play(String asset,
+      {bool isError = false, bool isFail = false}) async {
     try {
       if (await Vibration.hasVibrator()) {
         if (isFail) {
@@ -80,8 +77,11 @@ class _EtiquetaPageState extends State<EtiquetaPage>
           Vibration.vibrate(duration: 150);
         }
       } else {
-        if (isFail || isError) { HapticFeedback.vibrate(); }
-        else { HapticFeedback.heavyImpact(); }
+        if (isFail || isError) {
+          HapticFeedback.vibrate();
+        } else {
+          HapticFeedback.heavyImpact();
+        }
       }
       await _audio.play(AssetSource(asset));
     } catch (e) {
@@ -98,8 +98,6 @@ class _EtiquetaPageState extends State<EtiquetaPage>
     _cab1Controller    = TextEditingController(text: config.cabecalhoLinha1);
     _cab2Controller    = TextEditingController(text: config.cabecalhoLinha2);
     _rodapeController  = TextEditingController(text: config.rodapeTexto);
-    _larguraController = TextEditingController(text: config.larguraMmCustom.toString());
-    _alturaController  = TextEditingController(text: config.alturaMmCustom.toString());
     _copiasController  = TextEditingController(text: config.copiasPorItem.toString());
   }
 
@@ -132,15 +130,24 @@ class _EtiquetaPageState extends State<EtiquetaPage>
       cabecalhoLinha1: _cab1Controller.text.trim(),
       cabecalhoLinha2: _cab2Controller.text.trim(),
       rodapeTexto:     _rodapeController.text.trim(),
-      larguraMmCustom: int.tryParse(_larguraController.text) ?? 50,
-      alturaMmCustom:  int.tryParse(_alturaController.text) ?? 30,
       copiasPorItem:   int.tryParse(_copiasController.text)?.clamp(1, 99) ?? 1,
     );
     await novaConfig.salvar();
     await _play('sounds/check.mp3');
     if (mounted) {
       setState(() => _config = novaConfig);
-      _mostrarSnackBar('Configurações salvas!', Colors.green.shade700);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Row(children: [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('Configurações salvas!',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+        ]),
+        backgroundColor: Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 2),
+      ));
       _tabController.animateTo(0);
     }
   }
@@ -169,7 +176,6 @@ class _EtiquetaPageState extends State<EtiquetaPage>
       for (final item in _itensParaImprimir) {
         for (int copia = 0; copia < _config.copiasPorItem; copia++) {
           await _imprimirItem(item);
-          // Beep a cada etiqueta impressa
           await _play('sounds/beep.mp3');
         }
         if (mounted) setState(() => _printedCount++);
@@ -178,7 +184,6 @@ class _EtiquetaPageState extends State<EtiquetaPage>
       await bluetooth.disconnect();
 
       if (mounted) {
-        // Lote concluído → check.mp3 longo
         await _play('sounds/check.mp3');
         final total = _itensParaImprimir.length * _config.copiasPorItem;
         _mostrarSnackBar(
@@ -304,7 +309,9 @@ class _EtiquetaPageState extends State<EtiquetaPage>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+        ],
       ),
       child: Row(children: [
         Icon(Icons.print_rounded, color: Theme.of(context).primaryColor),
@@ -315,10 +322,12 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               isExpanded: true,
               hint: const Text('Selecione a Impressora'),
               value: _selectedDevice,
-              items: _devices.map((device) => DropdownMenuItem(
-                value: device,
-                child: Text(device.name ?? 'Dispositivo Desconhecido'),
-              )).toList(),
+              items: _devices
+                  .map((device) => DropdownMenuItem(
+                        value: device,
+                        child: Text(device.name ?? 'Dispositivo Desconhecido'),
+                      ))
+                  .toList(),
               onChanged: (device) {
                 HapticFeedback.selectionClick();
                 setState(() => _selectedDevice = device);
@@ -327,8 +336,9 @@ class _EtiquetaPageState extends State<EtiquetaPage>
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh_rounded),
           color: Theme.of(context).primaryColor,
+          tooltip: 'Atualizar dispositivos',
           onPressed: () {
             HapticFeedback.lightImpact();
             _getBluetoothDevices();
@@ -359,7 +369,8 @@ class _EtiquetaPageState extends State<EtiquetaPage>
           border: Border.all(color: Colors.blue.shade100),
         ),
         child: Row(children: [
-          Icon(Icons.info_outline_rounded, color: Colors.blue.shade700, size: 18),
+          Icon(Icons.info_outline_rounded,
+              color: Colors.blue.shade700, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -381,8 +392,10 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               color: Theme.of(context).primaryColor,
             ),
             const SizedBox(height: 8),
-            Text('Imprimindo $_printedCount de ${_itensParaImprimir.length}...',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            Text(
+                'Imprimindo $_printedCount de ${_itensParaImprimir.length}...',
+                style:
+                    TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             const SizedBox(height: 16),
           ]),
         ),
@@ -401,17 +414,20 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               ),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).primaryColor.withAlpha(26),
+                  backgroundColor:
+                      Theme.of(context).primaryColor.withAlpha(26),
                   child: Icon(Icons.label_rounded,
                       color: Theme.of(context).primaryColor, size: 20),
                 ),
-                title:    Text(item['ItemCode'] ?? '',
+                title: Text(item['ItemCode'] ?? '',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(item['ItemName'] ?? ''),
-                trailing: Text('× ${_config.copiasPorItem}',
-                    style: TextStyle(
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.bold)),
+                trailing: Text(
+                  '× ${_config.copiasPorItem}',
+                  style: TextStyle(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold),
+                ),
               ),
             );
           },
@@ -429,61 +445,9 @@ class _EtiquetaPageState extends State<EtiquetaPage>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
 
-          _sectionTitle('Tamanho da Etiqueta'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8, runSpacing: 8,
-            children: TamanhoEtiqueta.values.map((t) {
-              final selected = _config.tamanho == t;
-              return ChoiceChip(
-                label: Text(t.label),
-                selected: selected,
-                selectedColor: Theme.of(context).primaryColor.withAlpha(40),
-                labelStyle: TextStyle(
-                  color: selected ? Theme.of(context).primaryColor : Colors.grey.shade700,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                ),
-                onSelected: (_) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _config = _config.copyWith(tamanho: t));
-                },
-              );
-            }).toList(),
-          ),
-
-          if (_config.tamanho == TamanhoEtiqueta.personalizado) ...[
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _larguraController,
-                  keyboardType: TextInputType.number,
-                  onTap: () => HapticFeedback.selectionClick(),
-                  decoration: const InputDecoration(
-                    labelText: 'Largura (mm)',
-                    prefixIcon: Icon(Icons.width_normal_rounded),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _alturaController,
-                  keyboardType: TextInputType.number,
-                  onTap: () => HapticFeedback.selectionClick(),
-                  decoration: const InputDecoration(
-                    labelText: 'Altura (mm)',
-                    prefixIcon: Icon(Icons.height_rounded),
-                  ),
-                ),
-              ),
-            ]),
-          ],
-
-          const SizedBox(height: 24),
-          const Divider(),
-
-          _sectionTitle('Cabeçalho'),
+          // ── Cabeçalho ──────────────────────────────────────────────────
+          _sectionTitle('Cabeçalho da Etiqueta'),
+          const SizedBox(height: 4),
           SwitchListTile.adaptive(
             title: const Text('Mostrar cabeçalho'),
             value: _config.mostrarCabecalho,
@@ -500,8 +464,9 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               textCapitalization: TextCapitalization.characters,
               onTap: () => HapticFeedback.selectionClick(),
               decoration: const InputDecoration(
-                  labelText: 'Linha 1 (ex: STOX AGRO)',
-                  prefixIcon: Icon(Icons.title_rounded)),
+                labelText: 'Linha 1 (ex: GRUPO JCN)',
+                prefixIcon: Icon(Icons.title_rounded),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -509,29 +474,38 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               textCapitalization: TextCapitalization.words,
               onTap: () => HapticFeedback.selectionClick(),
               decoration: const InputDecoration(
-                  labelText: 'Linha 2 (opcional)',
-                  prefixIcon: Icon(Icons.subtitles_rounded)),
+                labelText: 'Linha 2 (opcional)',
+                prefixIcon: Icon(Icons.subtitles_rounded),
+              ),
             ),
           ],
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           const Divider(),
 
+          // ── Campos do item ─────────────────────────────────────────────
           _sectionTitle('Campos do Item'),
+          const SizedBox(height: 4),
           _switchItem('Nome do item', _config.mostrarNomeItem,
-              (v) => setState(() => _config = _config.copyWith(mostrarNomeItem: v))),
+              (v) => setState(
+                  () => _config = _config.copyWith(mostrarNomeItem: v))),
           _switchItem('Código de barras (QR)', _config.mostrarCodigoBarras,
-              (v) => setState(() => _config = _config.copyWith(mostrarCodigoBarras: v))),
+              (v) => setState(
+                  () => _config = _config.copyWith(mostrarCodigoBarras: v))),
           _switchItem('Código em texto', _config.mostrarCodigoTexto,
-              (v) => setState(() => _config = _config.copyWith(mostrarCodigoTexto: v))),
+              (v) => setState(
+                  () => _config = _config.copyWith(mostrarCodigoTexto: v))),
           _switchItem('Depósito', _config.mostrarDeposito,
-              (v) => setState(() => _config = _config.copyWith(mostrarDeposito: v))),
+              (v) => setState(
+                  () => _config = _config.copyWith(mostrarDeposito: v))),
           _switchItem('Unidade de medida', _config.mostrarUnidade,
-              (v) => setState(() => _config = _config.copyWith(mostrarUnidade: v))),
+              (v) => setState(
+                  () => _config = _config.copyWith(mostrarUnidade: v))),
 
           const SizedBox(height: 8),
           const Divider(),
 
+          // ── Rodapé ─────────────────────────────────────────────────────
           _sectionTitle('Rodapé'),
           SwitchListTile.adaptive(
             title: const Text('Mostrar rodapé'),
@@ -548,33 +522,45 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               controller: _rodapeController,
               onTap: () => HapticFeedback.selectionClick(),
               decoration: const InputDecoration(
-                  labelText: 'Texto do rodapé (ex: VER. 1.0)',
-                  prefixIcon: Icon(Icons.text_snippet_rounded)),
+                labelText: 'Texto do rodapé (ex: VER. 1.0)',
+                prefixIcon: Icon(Icons.text_snippet_rounded),
+              ),
             ),
           ],
 
           const SizedBox(height: 16),
           const Divider(),
 
-          _sectionTitle('Impressão'),
+          // ── Cópias ─────────────────────────────────────────────────────
+          _sectionTitle('Cópias por Item'),
           const SizedBox(height: 8),
           TextField(
             controller: _copiasController,
             keyboardType: TextInputType.number,
             onTap: () => HapticFeedback.selectionClick(),
             decoration: const InputDecoration(
-              labelText: 'Cópias por item',
+              labelText: 'Quantidade de cópias',
               prefixIcon: Icon(Icons.content_copy_rounded),
-              helperText: 'Quantas etiquetas imprimir por item.',
+              helperText: 'Quantas etiquetas imprimir por item (1–99).',
             ),
           ),
 
           const SizedBox(height: 32),
 
-          ElevatedButton.icon(
+          // ── Botão Salvar — visual diferenciado (outlined) ───────────────
+          OutlinedButton.icon(
             onPressed: _salvarConfig,
             icon: const Icon(Icons.save_rounded),
-            label: const Text('SALVAR CONFIGURAÇÕES'),
+            label: const Text('SALVAR CONFIGURAÇÕES',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 52),
+              side: BorderSide(
+                  color: Theme.of(context).primaryColor, width: 1.5),
+              foregroundColor: Theme.of(context).primaryColor,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
           ),
 
           const SizedBox(height: 20),
@@ -585,16 +571,20 @@ class _EtiquetaPageState extends State<EtiquetaPage>
 
   Widget _sectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 2),
-      child: Text(title,
-          style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Theme.of(context).primaryColor)),
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: Theme.of(context).primaryColor,
+        ),
+      ),
     );
   }
 
-  Widget _switchItem(String label, bool value, ValueChanged<bool> onChanged) {
+  Widget _switchItem(
+      String label, bool value, ValueChanged<bool> onChanged) {
     return SwitchListTile.adaptive(
       title: Text(label, style: const TextStyle(fontSize: 14)),
       value: value,
@@ -614,10 +604,9 @@ class _EtiquetaPageState extends State<EtiquetaPage>
     final nome   = item['ItemName']?.toString() ?? '';
     final dep    = item['_deposito']?.toString() ?? widget.deposito;
 
-    final double ratio        = _config.largura > 0 ? _config.altura / _config.largura : 1.0;
-    const double previewWidth = 260.0;
-    final double previewHeight =
-        (previewWidth * ratio).clamp(80.0, 400.0);
+    // Preview fixo proporcional — o tamanho real é gerenciado pela impressora
+    const double previewWidth  = 260.0;
+    const double previewHeight = 160.0;
 
     return Container(
       width: previewWidth,
@@ -663,7 +652,7 @@ class _EtiquetaPageState extends State<EtiquetaPage>
                 barcode:  Barcode.code128(),
                 data:     codigo.isEmpty ? '000' : codigo,
                 width:    previewWidth - 40,
-                height:   40,
+                height:   38,
                 drawText: false,
               ),
             ),
@@ -684,7 +673,8 @@ class _EtiquetaPageState extends State<EtiquetaPage>
                   Text('DEP: $dep',
                       style: const TextStyle(
                           fontSize: 9, fontWeight: FontWeight.bold)),
-                if (_config.mostrarRodape && _config.rodapeTexto.isNotEmpty)
+                if (_config.mostrarRodape &&
+                    _config.rodapeTexto.isNotEmpty)
                   Text(_config.rodapeTexto,
                       style: TextStyle(
                           fontSize: 8, color: Colors.grey.shade500)),
@@ -701,18 +691,20 @@ class _EtiquetaPageState extends State<EtiquetaPage>
   Widget _buildPrintButton() {
     final total = _itensParaImprimir.length * _config.copiasPorItem;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
+          BoxShadow(
+              color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
         ],
       ),
       child: ElevatedButton.icon(
         onPressed: _isPrinting ? null : _imprimir,
         icon: _isPrinting
             ? const SizedBox(
-                height: 20, width: 20,
+                height: 20,
+                width: 20,
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2.5))
             : const Icon(Icons.print_rounded),
@@ -722,7 +714,12 @@ class _EtiquetaPageState extends State<EtiquetaPage>
               : _isLote
                   ? 'IMPRIMIR $total ETIQUETA${total != 1 ? 'S' : ''}'
                   : 'IMPRIMIR ETIQUETA',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 54),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );

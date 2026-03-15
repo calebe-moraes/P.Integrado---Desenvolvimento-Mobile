@@ -27,16 +27,70 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
   bool _loading            = false;
   bool _scannerProcessando = false;
 
-  bool _modoSelecao = false;
-  final Set<String>                       _selecionados      = {};
-  final Map<String, Map<String, dynamic>> _itensSelecionados = {};
+  // ── Carrinho de impressão ─────────────────────────────────────────────────
+  // Persiste durante toda a sessão na tela, independente da busca ativa
+  final Map<String, Map<String, dynamic>> _carrinho = {};
 
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    _searchController.dispose();
-    _audio.dispose();
-    super.dispose();
+  bool get _temItensNoCarrinho => _carrinho.isNotEmpty;
+
+  void _adicionarAoCarrinho(Map<String, dynamic> item) {
+    final code = item['ItemCode'] as String;
+    HapticFeedback.mediumImpact();
+    setState(() => _carrinho[code] = Map<String, dynamic>.from(item));
+    _mostrarAviso('${item['ItemCode']} adicionado à fila de impressão.',
+        isSuccess: true);
+  }
+
+  void _removerDoCarrinho(String code) {
+    HapticFeedback.selectionClick();
+    setState(() => _carrinho.remove(code));
+  }
+
+  bool _estaNoCarrinho(String code) => _carrinho.containsKey(code);
+
+  void _irParaImpressao() {
+    if (_carrinho.isEmpty) return;
+    HapticFeedback.lightImpact();
+    final itens = _carrinho.values.toList();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EtiquetaPage(
+          itemData:  itens.first,
+          deposito:  itens.first['_deposito']?.toString() ?? '01',
+          itenslote: itens,
+        ),
+      ),
+    );
+  }
+
+  void _mostrarCarrinho() {
+    HapticFeedback.lightImpact();
+    // Usa Navigator para poder chamar setState do sheet via pop+push
+    // ou simplesmente abre como rota que lê direto do _carrinho pai
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      // Usa o builder sem StatefulBuilder — o sheet lê _carrinho
+      // direto do estado pai. Para forçar rebuild do sheet ao remover,
+      // fechamos e reabrimos via setState + showModalBottomSheet não é
+      // necessário: usamos um ValueNotifier local sincronizado.
+      builder: (ctx) => _CarrinhoSheet(
+        carrinho: _carrinho,
+        primaryColor: Theme.of(context).primaryColor,
+        onRemover: (code) {
+          setState(() => _carrinho.remove(code));
+        },
+        onLimpar: () {
+          setState(() => _carrinho.clear());
+        },
+        onImprimir: () {
+          Navigator.pop(ctx);
+          _irParaImpressao();
+        },
+      ),
+    );
   }
 
   // ─── FEEDBACK ────────────────────────────────────────────────────────────
@@ -65,76 +119,6 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     }
   }
 
-  // ─── SELEÇÃO MÚLTIPLA ─────────────────────────────────────────────────────
-
-  void _entrarModoSelecao(Map<String, dynamic> item) {
-    HapticFeedback.mediumImpact();
-    final code = item['ItemCode'] as String;
-    setState(() {
-      _modoSelecao = true;
-      _selecionados.add(code);
-      _itensSelecionados[code] = Map<String, dynamic>.from(item);
-    });
-  }
-
-  void _sairModoSelecao() {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _modoSelecao = false;
-      _selecionados.clear();
-      _itensSelecionados.clear();
-    });
-  }
-
-  void _toggleSelecao(Map<String, dynamic> item) {
-    HapticFeedback.selectionClick();
-    final code = item['ItemCode'] as String;
-    setState(() {
-      if (_selecionados.contains(code)) {
-        _selecionados.remove(code);
-        _itensSelecionados.remove(code);
-        if (_selecionados.isEmpty) _modoSelecao = false;
-      } else {
-        _selecionados.add(code);
-        _itensSelecionados[code] = Map<String, dynamic>.from(item);
-      }
-    });
-  }
-
-  void _selecionarTodos() {
-    HapticFeedback.selectionClick();
-    setState(() {
-      if (_selecionados.length == _searchResults.length) {
-        _selecionados.clear();
-        _itensSelecionados.clear();
-        _modoSelecao = false;
-      } else {
-        for (final item in _searchResults) {
-          final m    = item as Map<String, dynamic>;
-          final code = m['ItemCode'] as String;
-          _selecionados.add(code);
-          _itensSelecionados[code] = Map<String, dynamic>.from(m);
-        }
-      }
-    });
-  }
-
-  void _imprimirLote() {
-    if (_selecionados.isEmpty) return;
-    HapticFeedback.lightImpact();
-    final itens = _itensSelecionados.values.toList();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EtiquetaPage(
-          itemData:  itens.first,
-          deposito:  itens.first['_deposito']?.toString() ?? '01',
-          itenslote: itens,
-        ),
-      ),
-    );
-  }
-
   // ─── BUSCA ────────────────────────────────────────────────────────────────
 
   Future<void> _buscar({bool autoSearch = false}) async {
@@ -147,16 +131,13 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
       FocusScope.of(context).unfocus();
       HapticFeedback.lightImpact();
     }
-    if (_modoSelecao) _sairModoSelecao();
 
-    // Verifica se há sessão SAP ativa antes de tentar qualquer requisição
     final sessaoAtiva = await SapService.verificarSessao();
     if (!sessaoAtiva) {
       if (!autoSearch && mounted) {
         await _play('sounds/error_beep.mp3', isError: true);
         _mostrarErro(
-          'Sessão SAP não encontrada. Faça login antes de pesquisar itens.',
-        );
+            'Sessão SAP não encontrada. Faça login antes de pesquisar.');
       }
       return;
     }
@@ -244,17 +225,24 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     ));
   }
 
-  void _mostrarAviso(String msg) {
+  void _mostrarAviso(String msg, {bool isSuccess = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [
-        const Icon(Icons.warning_amber_rounded, color: Colors.white),
+        Icon(
+          isSuccess
+              ? Icons.check_circle_outline_rounded
+              : Icons.warning_amber_rounded,
+          color: Colors.white,
+        ),
         const SizedBox(width: 8),
         Expanded(
             child: Text(msg,
                 style: const TextStyle(fontWeight: FontWeight.bold))),
       ]),
-      backgroundColor: Colors.orange.shade700,
+      backgroundColor:
+          isSuccess ? Colors.green.shade700 : Colors.orange.shade700,
       behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ));
   }
@@ -354,7 +342,8 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                       height: scanWindow.height,
                       decoration: BoxDecoration(
                         border: Border.all(
-                            color: Theme.of(context).primaryColor, width: 3),
+                            color: Theme.of(context).primaryColor,
+                            width: 3),
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
@@ -376,96 +365,70 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return PopScope(
-      canPop: !_modoSelecao,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _modoSelecao) _sairModoSelecao();
-      },
-      child: Scaffold(
-        appBar: _modoSelecao
-            ? _buildAppBarSelecao(theme)
-            : AppBar(title: const Text('Consultar Item')),
-        body: SafeArea(
-          child: Column(children: [
-            if (!_modoSelecao) _buildSearchBar(),
-            if (_loading)
-              const Expanded(
-                  child: Center(child: CircularProgressIndicator())),
-            if (!_loading && _searchResults.isNotEmpty)
-              _buildSearchSuggestions(),
-            if (!_loading && _itemData != null) _buildResultList(),
-            if (!_loading &&
-                _itemData == null &&
-                _searchResults.isEmpty)
-              Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_rounded,
-                          size: 64, color: Colors.grey.shade300),
-                      const SizedBox(height: 16),
-                      Text('Busque por código, nome ou use a IA.',
-                          style: TextStyle(color: Colors.grey.shade500)),
-                    ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Consultar Item'),
+        actions: [
+          // Ícone do carrinho com badge
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.print_rounded),
+                tooltip: 'Fila de impressão',
+                onPressed: _mostrarCarrinho,
+              ),
+              if (_temItensNoCarrinho)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${_carrinho.length}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
+                ),
+            ],
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(children: [
+          _buildSearchBar(),
+          if (_loading)
+            const Expanded(
+                child: Center(child: CircularProgressIndicator())),
+          if (!_loading && _searchResults.isNotEmpty)
+            _buildSearchSuggestions(),
+          if (!_loading && _itemData != null) _buildResultList(),
+          if (!_loading && _itemData == null && _searchResults.isEmpty)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_rounded,
+                        size: 64, color: Colors.grey.shade300),
+                    const SizedBox(height: 16),
+                    Text('Busque por código ou nome.',
+                        style: TextStyle(color: Colors.grey.shade500)),
+                  ],
                 ),
               ),
-          ]),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        floatingActionButton: _modoSelecao && _selecionados.isNotEmpty
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _imprimirLote,
-                    icon: const Icon(Icons.print_rounded),
-                    label: Text(
-                      'Imprimir ${_selecionados.length} '
-                      '${_selecionados.length == 1 ? "etiqueta" : "etiquetas"}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primaryColor,
-                      foregroundColor: Colors.white,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-              )
-            : null,
+            ),
+        ]),
       ),
-    );
-  }
-
-  AppBar _buildAppBarSelecao(ThemeData theme) {
-    return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.close_rounded),
-        onPressed: _sairModoSelecao,
-        tooltip: 'Cancelar seleção',
-      ),
-      title: Text(
-          '${_selecionados.length} selecionado${_selecionados.length != 1 ? "s" : ""}'),
-      actions: [
-        TextButton(
-          onPressed: _selecionarTodos,
-          child: Text(
-            _selecionados.length == _searchResults.length
-                ? 'Desmarcar todos'
-                : 'Selecionar todos',
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
     );
   }
 
@@ -531,178 +494,149 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
   Widget _buildSearchSuggestions() {
     final theme = Theme.of(context);
     return Expanded(
-      child: Column(children: [
-        if (!_modoSelecao)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Row(children: [
-              Icon(Icons.touch_app_rounded,
-                  size: 14, color: Colors.grey.shade500),
-              const SizedBox(width: 4),
-              Text('Segure um item para selecionar e imprimir em lote',
-                  style:
-                      TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-            ]),
-          ),
-        if (_modoSelecao)
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: theme.primaryColor.withAlpha(15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: theme.primaryColor.withAlpha(40)),
-            ),
-            child: Row(children: [
-              Icon(Icons.print_rounded, color: theme.primaryColor, size: 16),
-              const SizedBox(width: 8),
-              Text('Selecione os itens para imprimir etiquetas em lote.',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: theme.primaryColor,
-                      fontWeight: FontWeight.w500)),
-            ]),
-          ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-            itemCount: _searchResults.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final item       = _searchResults[index] as Map<String, dynamic>;
-              final code       = item['ItemCode'] as String;
-              final selecionado = _selecionados.contains(code);
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        itemCount: _searchResults.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final item  = _searchResults[index] as Map<String, dynamic>;
+          final code  = item['ItemCode'] as String;
+          final noCarrinho = _estaNoCarrinho(code);
 
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: selecionado
-                        ? theme.primaryColor
-                        : Colors.grey.shade300,
-                    width: selecionado ? 2 : 1,
+          return Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: noCarrinho
+                    ? theme.primaryColor.withAlpha(80)
+                    : Colors.grey.shade300,
+              ),
+            ),
+            color: noCarrinho
+                ? theme.primaryColor.withAlpha(8)
+                : Colors.white,
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: theme.primaryColor.withAlpha(20),
+                child: Icon(Icons.inventory_2_outlined,
+                    color: theme.primaryColor, size: 18),
+              ),
+              title: Text(item['ItemName'] ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(code,
+                  style: TextStyle(color: Colors.grey.shade600)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Botão adicionar/remover do carrinho
+                  IconButton(
+                    icon: Icon(
+                      noCarrinho
+                          ? Icons.print_disabled_rounded
+                          : Icons.add_to_queue_rounded,
+                      color: noCarrinho
+                          ? Colors.red.shade400
+                          : theme.primaryColor,
+                    ),
+                    tooltip: noCarrinho
+                        ? 'Remover da fila'
+                        : 'Adicionar à fila de impressão',
+                    onPressed: () {
+                      if (noCarrinho) {
+                        _removerDoCarrinho(code);
+                      } else {
+                        _adicionarAoCarrinho(item);
+                      }
+                    },
                   ),
-                  color: selecionado
-                      ? theme.primaryColor.withAlpha(12)
-                      : Colors.white,
-                ),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  leading: _modoSelecao
-                      ? Checkbox(
-                          value: selecionado,
-                          onChanged: (_) => _toggleSelecao(item),
-                          activeColor: theme.primaryColor,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4)),
-                        )
-                      : CircleAvatar(
-                          backgroundColor: theme.primaryColor.withAlpha(20),
-                          child: Icon(Icons.inventory_2_outlined,
-                              color: theme.primaryColor, size: 18),
-                        ),
-                  title: Text(item['ItemName'] ?? '',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: selecionado
-                              ? theme.primaryColor
-                              : Colors.black87)),
-                  subtitle: Text(code,
-                      style: TextStyle(color: Colors.grey.shade600)),
-                  trailing: _modoSelecao
-                      ? null
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.print_rounded,
-                                  color: theme.primaryColor),
-                              tooltip: 'Imprimir etiqueta',
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => EtiquetaPage(
-                                      itemData:
-                                          Map<String, dynamic>.from(item),
-                                      deposito: '01',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            Icon(Icons.arrow_forward_ios_rounded,
-                                size: 14, color: Colors.grey.shade400),
-                          ],
-                        ),
-                  onTap: _modoSelecao
-                      ? () => _toggleSelecao(item)
-                      : () => _carregarDetalhes(code),
-                  onLongPress: _modoSelecao
-                      ? null
-                      : () => _entrarModoSelecao(item),
-                ),
-              );
-            },
-          ),
-        ),
-      ]),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      size: 14, color: Colors.grey.shade400),
+                ],
+              ),
+              onTap: () => _carregarDetalhes(code),
+            ),
+          );
+        },
+      ),
     );
   }
 
   // ─── DETALHE DO ITEM ──────────────────────────────────────────────────────
 
   Widget _buildResultList() {
+    final noCarrinho =
+        _estaNoCarrinho(_itemData!['ItemCode'] ?? '');
     return Expanded(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           _buildHeaderCard(),
+
+          // Botão adicionar/remover do carrinho — logo abaixo do card
+          const SizedBox(height: 12),
+          noCarrinho
+              ? OutlinedButton.icon(
+                  onPressed: () =>
+                      _removerDoCarrinho(_itemData!['ItemCode']),
+                  icon: const Icon(Icons.remove_circle_outline),
+                  label: const Text('REMOVER DA FILA DE IMPRESSÃO',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    foregroundColor: Colors.red.shade600,
+                    side: BorderSide(color: Colors.red.shade300),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                )
+              : ElevatedButton.icon(
+                  onPressed: () => _adicionarAoCarrinho(_itemData!),
+                  icon: const Icon(Icons.add_to_queue_rounded),
+                  label: const Text('ADICIONAR À FILA DE IMPRESSÃO',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+
           _buildStatusFlags(),
 
-          // ── Estoque por depósito ──────────────────────────────────────────
           _buildSectionTitle('Estoque por Depósito'),
           _buildWarehouseInfo(),
 
-          // ── Identificação ─────────────────────────────────────────────────
           _buildSectionTitle('Identificação'),
           _buildInfoCard([
-            _buildDetailRow('Unidade de Medida',
-                _itemData!['InventoryUOM']?.toString()),
-            _buildDetailRow('Embalagem',
-                _itemData!['SalesPackagingUnit']?.toString()),
-            _buildDetailRow('Código de Barras (EAN)',
-                _itemData!['BarCode']?.toString()),
-            _buildDetailRow('Código Adicional (SWW)',
-                _itemData!['SWW']?.toString()),
-            _buildDetailRow('Nome Estrangeiro',
-                _itemData!['ForeignName']?.toString()),
-            _buildDetailRow('Grupo (código)',
-                _itemData!['ItemsGroupCode']?.toString()),
-            _buildDetailRow('NCM',
-                _itemData!['NCMCode']?.toString()),
+            _buildDetailRow(
+                'Unidade de Medida', _itemData!['InventoryUOM']?.toString()),
+            _buildDetailRow(
+                'Embalagem', _itemData!['SalesPackagingUnit']?.toString()),
+            _buildDetailRow(
+                'Código de Barras (EAN)', _itemData!['BarCode']?.toString()),
+            _buildDetailRow(
+                'Código Adicional (SWW)', _itemData!['SWW']?.toString()),
+            _buildDetailRow(
+                'Nome Estrangeiro', _itemData!['ForeignName']?.toString()),
+            _buildDetailRow(
+                'Grupo (código)', _itemData!['ItemsGroupCode']?.toString()),
+            _buildDetailRow('NCM', _itemData!['NCMCode']?.toString()),
           ]),
 
-          // ── Controle de estoque ───────────────────────────────────────────
           _buildSectionTitle('Controle de Estoque'),
           _buildInfoCard([
-            _buildDetailRow(
-              'Estoque Total',
-              _formatNum(_itemData!['QuantityOnStock']),
-              destaque: true,
-            ),
+            _buildDetailRow('Estoque Total',
+                _formatNum(_itemData!['QuantityOnStock']),
+                destaque: true),
             _buildDetailRow('Pedidos de Clientes',
                 _formatNum(_itemData!['QuantityOrderedByCustomers'])),
             _buildDetailRow('Pedidos a Fornecedores',
                 _formatNum(_itemData!['QuantityOrderedFromVendors'])),
-            _buildDetailRow('Estoque Mínimo',
-                _formatNum(_itemData!['MinInventory'])),
-            _buildDetailRow('Estoque Máximo',
-                _formatNum(_itemData!['MaxInventory'])),
+            _buildDetailRow(
+                'Estoque Mínimo', _formatNum(_itemData!['MinInventory'])),
+            _buildDetailRow(
+                'Estoque Máximo', _formatNum(_itemData!['MaxInventory'])),
             _buildDetailRow('Qtd. Mínima de Pedido',
                 _formatNum(_itemData!['MinOrderQuantity'])),
             _buildDetailRow('Controle por Lote',
@@ -711,35 +645,31 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                 _itemData!['ManageSerialNumbers'] == 'tYES' ? 'Sim' : 'Não'),
           ]),
 
-          // ── Fornecimento e Preços ─────────────────────────────────────────
           _buildSectionTitle('Fornecimento e Preços'),
           _buildInfoCard([
             _buildDetailRow('Fornecedor Principal',
                 _itemData!['Mainsupplier']?.toString()),
-            _buildDetailRow('Fabricante (código)',
-                _itemData!['Manufacturer']?.toString()),
+            _buildDetailRow(
+                'Fabricante (código)', _itemData!['Manufacturer']?.toString()),
             _buildDetailRow('Preço Médio Móvel',
                 _formatPreco(_itemData!['MovingAveragePrice'])),
             _buildDetailRow('Preço Médio / Padrão',
                 _formatPreco(_itemData!['AvgStdPrice'])),
-            _buildDetailRow('Preço Lista 1',
-                _formatPrecoLista(1)),
+            _buildDetailRow('Preço Lista 1', _formatPrecoLista(1)),
           ]),
 
-          // ── Dimensões e Peso ──────────────────────────────────────────────
           _buildSectionTitle('Dimensões e Peso'),
           _buildInfoCard([
-            _buildDetailRow('Peso',
-                _formatMedida(_itemData!['SalesUnitWeight'], 'kg')),
-            _buildDetailRow('Altura',
-                _formatMedida(_itemData!['SalesUnitHeight'], 'm')),
-            _buildDetailRow('Largura',
-                _formatMedida(_itemData!['SalesUnitWidth'], 'm')),
+            _buildDetailRow(
+                'Peso', _formatMedida(_itemData!['SalesUnitWeight'], 'kg')),
+            _buildDetailRow(
+                'Altura', _formatMedida(_itemData!['SalesUnitHeight'], 'm')),
+            _buildDetailRow(
+                'Largura', _formatMedida(_itemData!['SalesUnitWidth'], 'm')),
             _buildDetailRow('Comprimento',
                 _formatMedida(_itemData!['SalesUnitLength'], 'm')),
           ]),
 
-          // ── Status ────────────────────────────────────────────────────────
           _buildSectionTitle('Status'),
           _buildInfoCard([
             _buildDetailRow(
@@ -755,22 +685,19 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     );
   }
 
-  // ─── HELPERS DE FORMATAÇÃO ────────────────────────────────────────────────
+  // ─── FORMATAÇÃO ───────────────────────────────────────────────────────────
 
-  /// Busca preço de uma lista específica do SAP
   String? _formatPrecoLista(int lista) {
     final prices = _itemData!['ItemPrices'] as List? ?? [];
     try {
       final entry = prices.firstWhere(
-        (p) => p['PriceList'] == lista && (p['Price'] ?? 0) > 0,
-      );
+          (p) => p['PriceList'] == lista && (p['Price'] ?? 0) > 0);
       return _formatPreco(entry['Price']);
     } catch (_) {
       return null;
     }
   }
 
-  /// Formata número — retorna null se zero/nulo (campo fica oculto)
   String? _formatNum(dynamic val) {
     if (val == null) return null;
     final n = num.tryParse(val.toString());
@@ -778,7 +705,6 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     return n % 1 == 0 ? n.toInt().toString() : n.toStringAsFixed(2);
   }
 
-  /// Formata preço em BRL — retorna null se zero/nulo
   String? _formatPreco(dynamic val) {
     if (val == null) return null;
     final n = num.tryParse(val.toString());
@@ -786,7 +712,6 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     return 'R\$ ${n.toStringAsFixed(2)}';
   }
 
-  /// Formata medida com unidade — retorna null se zero/nulo
   String? _formatMedida(dynamic val, String unidade) {
     if (val == null) return null;
     final n = num.tryParse(val.toString());
@@ -794,20 +719,21 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     return '${n.toStringAsFixed(3)} $unidade';
   }
 
-  // ─── WIDGETS DE DETALHE ───────────────────────────────────────────────────
+  // ─── WIDGETS ──────────────────────────────────────────────────────────────
 
   Widget _buildHeaderCard() {
-    final theme    = Theme.of(context);
-    final qtdTotal = _itemData!['QuantityOnStock'];
-    final qtdNum   = num.tryParse(qtdTotal?.toString() ?? '0') ?? 0;
-    final qtdStr   = qtdNum % 1 == 0
+    final theme  = Theme.of(context);
+    final qtdNum = num.tryParse(
+            _itemData!['QuantityOnStock']?.toString() ?? '0') ??
+        0;
+    final qtdStr = qtdNum % 1 == 0
         ? qtdNum.toInt().toString()
         : qtdNum.toStringAsFixed(2);
-    final um       = _itemData!['InventoryUOM']?.toString() ?? '';
-
-    // Cor do estoque: verde se acima do mínimo, amarelo se abaixo, cinza se zero
-    final minimo   = num.tryParse(_itemData!['MinInventory']?.toString() ?? '0') ?? 0;
-    final corQtd   = qtdNum == 0
+    final um     = _itemData!['InventoryUOM']?.toString() ?? '';
+    final minimo = num.tryParse(
+            _itemData!['MinInventory']?.toString() ?? '0') ??
+        0;
+    final corQtd = qtdNum == 0
         ? Colors.white38
         : qtdNum < minimo
             ? Colors.orangeAccent
@@ -840,7 +766,6 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Quantidade em destaque no canto direito
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -856,18 +781,19 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                           fontSize: 12,
                           fontWeight: FontWeight.w500)),
                   Text('em estoque',
-                      style: TextStyle(
-                          color: Colors.white38,
-                          fontSize: 10)),
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 10)),
                 ],
               ),
             ],
           ),
-          // Barra visual proporcional ao estoque (min → max)
           if (minimo > 0 || qtdNum > 0) ...[
             const SizedBox(height: 16),
-            _buildEstoqueBarra(qtdNum, minimo,
-                num.tryParse(_itemData!['MaxInventory']?.toString() ?? '0') ?? 0),
+            _buildEstoqueBarra(
+                qtdNum,
+                minimo,
+                num.tryParse(_itemData!['MaxInventory']?.toString() ?? '0') ??
+                    0),
           ],
         ],
       ),
@@ -875,8 +801,11 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
   }
 
   Widget _buildEstoqueBarra(num atual, num minimo, num maximo) {
-    final referencia = maximo > 0 ? maximo : (minimo > 0 ? minimo * 3 : atual * 1.5);
-    final pct = referencia > 0 ? (atual / referencia).clamp(0.0, 1.0).toDouble() : 0.0;
+    final ref = maximo > 0
+        ? maximo
+        : (minimo > 0 ? minimo * 3 : atual * 1.5);
+    final pct =
+        ref > 0 ? (atual / ref).clamp(0.0, 1.0).toDouble() : 0.0;
     final cor = atual == 0
         ? Colors.white24
         : atual < minimo
@@ -900,10 +829,12 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
           children: [
             if (minimo > 0)
               Text('Mín: $minimo',
-                  style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  style: const TextStyle(
+                      color: Colors.white54, fontSize: 10)),
             if (maximo > 0)
               Text('Máx: $maximo',
-                  style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  style: const TextStyle(
+                      color: Colors.white54, fontSize: 10)),
           ],
         ),
       ],
@@ -912,7 +843,7 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
 
   Widget _buildStatusFlags() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       child: Wrap(
         spacing: 12,
         children: [
@@ -934,8 +865,7 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
   }
 
   Widget _buildWarehouseInfo() {
-    final list       =
-        (_itemData!['ItemWarehouseInfoCollection'] as List? ?? []);
+    final list = (_itemData!['ItemWarehouseInfoCollection'] as List? ?? []);
     final warehouses =
         list.where((wh) => (wh['InStock'] ?? 0) > 0).toList();
     if (warehouses.isEmpty) {
@@ -970,7 +900,7 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
             ),
             trailing: IconButton(
               icon: const Icon(Icons.print_rounded),
-              tooltip: 'Imprimir etiqueta',
+              tooltip: 'Imprimir etiqueta deste depósito',
               onPressed: () {
                 HapticFeedback.lightImpact();
                 Navigator.push(
@@ -994,15 +924,13 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     return Padding(
       padding: const EdgeInsets.only(top: 20, bottom: 8),
       child: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          style:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
     );
   }
 
-  /// Card com divisória entre linhas — campos nulos são automaticamente ocultos
   Widget _buildInfoCard(List<Widget> rows) {
-    // Filtra widgets vazios (SizedBox.shrink gerados por campos nulos)
-    final visible =
-        rows.where((w) => w is! SizedBox).toList();
+    final visible = rows.where((w) => w is! SizedBox).toList();
     if (visible.isEmpty) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1033,9 +961,6 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
     );
   }
 
-
-  /// Linha de detalhe. Retorna SizedBox.shrink() se value for null/vazio
-  /// para que _buildInfoCard possa filtrá-la.
   Widget _buildDetailRow(
     String label,
     String? value, {
@@ -1059,6 +984,226 @@ class _ItemSearchPageState extends State<ItemSearchPage> {
                   : Colors.black87,
         ),
       ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
+    _audio.dispose();
+    super.dispose();
+  }
+}
+
+// ─── SHEET DO CARRINHO ────────────────────────────────────────────────────────
+// Widget próprio com estado local — garante que a lista atualiza
+// imediatamente ao excluir sem depender de setState do pai.
+
+class _CarrinhoSheet extends StatefulWidget {
+  final Map<String, Map<String, dynamic>> carrinho;
+  final Color primaryColor;
+  final void Function(String code) onRemover;
+  final VoidCallback onLimpar;
+  final VoidCallback onImprimir;
+
+  const _CarrinhoSheet({
+    required this.carrinho,
+    required this.primaryColor,
+    required this.onRemover,
+    required this.onLimpar,
+    required this.onImprimir,
+  });
+
+  @override
+  State<_CarrinhoSheet> createState() => _CarrinhoSheetState();
+}
+
+class _CarrinhoSheetState extends State<_CarrinhoSheet> {
+  // Cópia local das chaves para controlar a lista sem depender do mapa pai
+  late List<String> _keys;
+
+  @override
+  void initState() {
+    super.initState();
+    _keys = widget.carrinho.keys.toList();
+  }
+
+  void _remover(String code) {
+    widget.onRemover(code);
+    setState(() => _keys.remove(code));
+    HapticFeedback.selectionClick();
+  }
+
+  void _limpar() {
+    widget.onLimpar();
+    setState(() => _keys.clear());
+    HapticFeedback.heavyImpact();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(children: [
+        // Handle
+        const SizedBox(height: 12),
+        Container(
+          width: 48, height: 6,
+          decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(10)),
+        ),
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+          child: Row(children: [
+            Icon(Icons.print_rounded, color: widget.primaryColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Fila de impressão (${_keys.length})',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            if (_keys.isNotEmpty)
+              TextButton.icon(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Limpar fila'),
+                    content: const Text(
+                        'Remover todos os itens da fila de impressão?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('CANCELAR'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _limpar();
+                        },
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade600),
+                        child: const Text('LIMPAR TUDO'),
+                      ),
+                    ],
+                  ),
+                ),
+                icon: Icon(Icons.delete_sweep_rounded,
+                    color: Colors.red.shade600, size: 18),
+                label: Text('Limpar',
+                    style: TextStyle(color: Colors.red.shade600)),
+              ),
+          ]),
+        ),
+        const Divider(height: 1),
+
+        // Lista com swipe para excluir
+        Expanded(
+          child: _keys.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.print_disabled_rounded,
+                          size: 48, color: Colors.grey.shade300),
+                      const SizedBox(height: 12),
+                      Text('Nenhum item na fila.',
+                          style:
+                              TextStyle(color: Colors.grey.shade500)),
+                      const SizedBox(height: 4),
+                      Text('Adicione itens pela busca.',
+                          style: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 12)),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  itemCount: _keys.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final code = _keys[index];
+                    final item = widget.carrinho[code]!;
+                    return Dismissible(
+                      key: Key(code),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade600,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.delete_rounded,
+                            color: Colors.white),
+                      ),
+                      onDismissed: (_) => _remover(code),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade200),
+                          color: Colors.white,
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor:
+                                widget.primaryColor.withAlpha(20),
+                            child: Icon(Icons.label_rounded,
+                                color: widget.primaryColor, size: 18),
+                          ),
+                          title: Text(code,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
+                          subtitle: Text(
+                            item['ItemName'] ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete_outline_rounded,
+                                color: Colors.red.shade400),
+                            tooltip: 'Remover da fila',
+                            onPressed: () => _remover(code),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+
+        // Botão imprimir
+        if (_keys.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: widget.onImprimir,
+                icon: const Icon(Icons.print_rounded),
+                label: Text(
+                  'Imprimir ${_keys.length} '
+                  '${_keys.length == 1 ? "etiqueta" : "etiquetas"}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+          ),
+      ]),
     );
   }
 }
