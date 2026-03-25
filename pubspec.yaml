@@ -51,6 +51,7 @@ flutter:
     - assets/images/logo.png           # Ícone de sistema
     - assets/images/Logo_colorida.png  # Logo das telas principais
     - assets/images/sap-logo.png
+    - assets/images/unifeob.png
     - assets/sounds/error_beep.mp3
     - assets/sounds/beep.mp3
     - assets/sounds/fail.mp3

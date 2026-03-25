@@ -107,18 +107,26 @@ class _LoginPageState extends State<LoginPage> {
                   mainAxisSize: MainAxisSize.max,
                   children: [
                     SizedBox(height: size.height * 0.08),
+
                     Image.asset('assets/images/Logo_colorida.png', height: 80),
+
                     const SizedBox(height: 24),
+
                     const Text(
                       'Contagem de Estoque',
                       style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.bold),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+
                     const SizedBox(height: 8),
+
                     Text(
                       'Informe seu usuário e senha do SAP',
                       style: TextStyle(color: Colors.grey.shade600),
                     ),
+
                     const SizedBox(height: 40),
 
                     StoxTextField(
@@ -127,6 +135,7 @@ class _LoginPageState extends State<LoginPage> {
                       prefixIcon:      Icons.person_outline,
                       textInputAction: TextInputAction.next,
                     ),
+
                     const SizedBox(height: 20),
 
                     StoxPasswordField(
@@ -142,6 +151,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: _limparCampos,
                       ),
                     ),
+
                     const SizedBox(height: 20),
 
                     StoxButton(
@@ -149,6 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                       loading:   _carregando,
                       onPressed: _login,
                     ),
+
                     const SizedBox(height: 16),
 
                     StoxOutlinedButton(
@@ -170,8 +181,29 @@ class _LoginPageState extends State<LoginPage> {
                         StoxApp.transicaoPadrao(const ApiConfigPage()),
                       ),
                     ),
+
                     const SizedBox(height: 20),
+
+                    // Logo SAP
                     Image.asset('assets/images/sap-logo.png', height: 20),
+
+                    const SizedBox(height: 16),
+
+                    // Logo FEOB
+                    Image.asset('assets/images/unifeob.png', height: 30),
+
+                    const SizedBox(height: 10),
+
+                    // Texto institucional
+                    Text(
+                      'STOX v1.0.0\nDesenvolvido pelos alunos do curso de Análise e Desenvolvimento de Sistemas 2026.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+
                     const SizedBox(height: 24),
                   ],
                 ),

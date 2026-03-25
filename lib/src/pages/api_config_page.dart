@@ -5,10 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/stox_audio.dart';
 import '../widgets/widgets.dart';
 
-/// Tela de configuração da conexão com o SAP Business One Service Layer.
-///
-/// Persiste URL, CompanyDB, depósito padrão e política de SSL
-/// via [SharedPreferences].
 class ApiConfigPage extends StatefulWidget {
   const ApiConfigPage({super.key});
 
@@ -17,8 +13,8 @@ class ApiConfigPage extends StatefulWidget {
 }
 
 class _ApiConfigPageState extends State<ApiConfigPage> {
-  final _urlController      = TextEditingController();
-  final _companyController  = TextEditingController();
+  final _urlController = TextEditingController();
+  final _companyController = TextEditingController();
   final _depositoController = TextEditingController();
 
   bool _permitirSslInseguro = true;
@@ -37,16 +33,17 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
     super.dispose();
   }
 
-  // ── Dados ─────────────────────────────────────────────────────────────────
-
   Future<void> _carregarConfig() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
+
     setState(() {
-      _urlController.text      = prefs.getString('sap_url')             ?? '';
-      _companyController.text  = prefs.getString('sap_company')         ?? '';
-      _depositoController.text = prefs.getString('sap_deposito_padrao') ?? '01';
-      _permitirSslInseguro     = prefs.getBool('sap_allow_untrusted')   ?? true;
+      _urlController.text = prefs.getString('sap_url') ?? '';
+      _companyController.text = prefs.getString('sap_company') ?? '';
+      _depositoController.text =
+          prefs.getString('sap_deposito_padrao') ?? '01';
+      _permitirSslInseguro =
+          prefs.getBool('sap_allow_untrusted') ?? true;
     });
   }
 
@@ -62,110 +59,155 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sap_url',             _urlController.text.trim());
-    await prefs.setString('sap_company',         _companyController.text.trim());
+    await prefs.setString('sap_url', _urlController.text.trim());
+    await prefs.setString('sap_company', _companyController.text.trim());
     await prefs.setString('sap_deposito_padrao', deposito.toUpperCase());
-    await prefs.setBool('sap_allow_untrusted',   _permitirSslInseguro);
+    await prefs.setBool('sap_allow_untrusted', _permitirSslInseguro);
 
     await StoxAudio.play('sounds/check.mp3');
     if (!mounted) return;
+
     StoxSnackbar.sucesso(context, 'Configurações salvas com sucesso!');
     Navigator.pop(context);
   }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Configuração SAP')),
+      appBar: AppBar(
+        title: const Text('Configuração SAP'),
+        // Remove a seta automática de voltar
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Conexão Service Layer',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ajuste os endereços para sincronização com o SAP Business One.',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-              ),
-              const SizedBox(height: 30),
+        child: LayoutBuilder(
+          builder: (_, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
 
-              StoxTextField(
-                controller:      _urlController,
-                labelText:       'Service Layer URL',
-                prefixIcon:      Icons.link,
-                keyboardType:    TextInputType.url,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 20),
+                      const Text(
+                        'Conexão Service Layer',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
 
-              StoxTextField(
-                controller:      _companyController,
-                labelText:       'CompanyDB',
-                prefixIcon:      Icons.business,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 20),
+                      const SizedBox(height: 8),
 
-              StoxTextField(
-                controller:         _depositoController,
-                labelText:          'Depósito Padrão',
-                prefixIcon:         Icons.warehouse_rounded,
-                textInputAction:    TextInputAction.done,
-                textCapitalization: TextCapitalization.characters,
-                onSubmitted:        (_) => _salvarConfig(),
-                helperText: 'Código do depósito usado nas contagens de inventário.',
-              ),
-              const SizedBox(height: 25),
+                      Text(
+                        'Ajuste os endereços para sincronização com o SAP Business One.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
 
-              StoxCard(
-                child: SwitchListTile.adaptive(
-                  title: const Text(
-                    'Permitir SSL pré-assinado',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 15),
+                      const SizedBox(height: 30),
+
+                      StoxTextField(
+                        controller: _urlController,
+                        labelText: 'Service Layer URL',
+                        prefixIcon: Icons.link,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      StoxTextField(
+                        controller: _companyController,
+                        labelText: 'CompanyDB',
+                        prefixIcon: Icons.business,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      StoxTextField(
+                        controller: _depositoController,
+                        labelText: 'Depósito Padrão',
+                        prefixIcon: Icons.warehouse_rounded,
+                        textCapitalization: TextCapitalization.characters,
+                      ),
+
+                      const SizedBox(height: 25),
+
+                      StoxCard(
+                        child: SwitchListTile.adaptive(
+                          title: const Text('Permitir SSL pré-assinado'),
+                          subtitle: Text(
+                            'Ative se o servidor SAP usar certificado auto-assinado.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          value: _permitirSslInseguro,
+                          // Correção do membro depreciado
+                          activeThumbColor: primaryColor,
+                          onChanged: (value) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _permitirSslInseguro = value);
+                          },
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+
+                      StoxButton(
+                        label: 'SALVAR CONFIGURAÇÕES',
+                        icon: Icons.save_rounded,
+                        onPressed: _salvarConfig,
+                      ),
+
+                      const Spacer(),
+
+                      StoxTextButton(
+                        label: 'Voltar',
+                        icon: Icons.arrow_back,
+                        onPressed: () => Navigator.pop(context),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Image.asset(
+                        'assets/images/sap-logo.png',
+                        height: 20,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      Image.asset(
+                        'assets/images/unifeob.png',
+                        height: 30,
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Text(
+                        'STOX v1.0.0\nDesenvolvido pelos alunos do curso de Análise e Desenvolvimento de Sistemas 2026.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+                    ],
                   ),
-                  subtitle: Text(
-                    'Ative se o servidor SAP usar certificado auto-assinado '
-                    '(comum em ambientes de desenvolvimento e teste).',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  value: _permitirSslInseguro,
-                  // ignore: deprecated_member_use
-                  activeColor: primaryColor,
-                  onChanged: (value) {
-                    HapticFeedback.selectionClick();
-                    setState(() => _permitirSslInseguro = value);
-                  },
                 ),
               ),
-
-              const SizedBox(height: 40),
-
-              StoxButton(
-                label:     'SALVAR CONFIGURAÇÕES',
-                icon:      Icons.save_rounded,
-                onPressed: _salvarConfig,
-              ),
-
-              const SizedBox(height: 48),
-              Text(
-                'STOX v1.0.0',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
