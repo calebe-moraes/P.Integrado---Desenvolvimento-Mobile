@@ -29,6 +29,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.1
   image_cropper: ^11.0.0
   local_auth: ^2.3.0
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:
@@ -48,10 +49,8 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/logo.png           # Ícone de sistema
-    - assets/images/Logo_colorida.png  # Logo das telas principais
-    - assets/images/sap-logo.png
-    - assets/images/unifeob.png
+    - assets/images/logo.png 
+    - assets/images/Logo_colorida.png  
     - assets/sounds/error_beep.mp3
     - assets/sounds/beep.mp3
     - assets/sounds/fail.mp3
