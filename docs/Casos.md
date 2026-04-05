@@ -1,6 +1,6 @@
 # Documentação do Sistema STOX
 
-O aplicativo STOX, idealizado pelo gerente Rafael Valentim, é uma solução de gestão de estoque desenvolvida para o Grupo JCN, com foco na integração em tempo real com o SAP Business One via Service Layer. Este documento centraliza os casos de uso, regras de negócio e a arquitetura técnica do projeto.
+O STOX é uma plataforma móvel corporativa desenvolvida para otimizar o processo de inventário físico do Grupo JCN. Idealizado pelo Gerente de TI Rafael Valentim e executado pela equipe de alunos de ADS, o projeto resolve problemas de alto custo com coletores de dados e falhas de digitação manual, utilizando uma abordagem Offline-First integrada ao SAP Business One.
 
 ---
 
