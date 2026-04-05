@@ -116,7 +116,7 @@ O STOX utiliza **Visão Computacional** através do **Google ML Kit**:
 │  │  Pages   │  │ Services │  │  Models  │   │
 │  │  (UI)    │  │ (Lógica) │  │ (Dados)  │   │
 │  └────┬─────┘  └────┬─────┘  └──────────┘   │
-│       │              │                      │
+│       │             │                       │
 │  ┌────▼─────────────▼─────────────────-─┐   │
 │  │           SQLite (Offline)           │   │
 │  └──────────────────────────────────────┘   │
