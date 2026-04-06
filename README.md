@@ -12,6 +12,10 @@
   <img src="https://github.com/calebe-moraes/P.Integrado---Desenvolvimento-Mobile/raw/main/assets/screenshot/mockup01.gif" width="720">
 </p>
 
+<p align="center">
+  <img src="https://github.com/calebe-moraes/P.Integrado---Desenvolvimento-Mobile/raw/main/assets/screenshot/image1.png" width="720">
+</p>
+
 ---
 
 ##  Resumo Executivo
