@@ -1,6 +1,6 @@
 #  STOX
 
-<p align="center">🌐 <a href="https://marciojcn.github.io/4-Projeto-Integrado-Unifeob/">Acesse a demonstração online do STOX</a></p>
+<p align="center">🌐 <a href="https://marciojcn.github.io/4-Projeto-Integrado-Unifeob/"></a></p>
 
 ### Plataforma Inteligente de Gestão de Inventário
 
