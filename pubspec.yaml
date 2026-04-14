@@ -6,6 +6,9 @@ environment:
   sdk: ^3.11.0
 
 dependencies:
+  google_generative_ai: ^0.4.3 # Para integração com Gemini
+  path_provider: ^2.1.0        # Para salvar o relatório PDF
+  intl: ^0.19.0                # Formatação de datas/moedas
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
@@ -22,7 +25,6 @@ dependencies:
   pdf: ^3.11.1
   blue_thermal_printer: ^1.2.3
   permission_handler: ^12.0.1
-  path_provider: ^2.1.2
   share_plus: ^12.0.1
   csv: ^7.2.0
   image_picker: ^1.2.1
@@ -55,3 +57,5 @@ flutter:
     - assets/sounds/beep.mp3
     - assets/sounds/fail.mp3
     - assets/sounds/check.mp3
+    - assets/README.md
+
