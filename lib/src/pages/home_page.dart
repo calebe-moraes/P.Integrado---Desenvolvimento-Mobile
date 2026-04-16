@@ -15,23 +15,24 @@ import 'api_config_page.dart';
 import 'contador_offline_page.dart';
 import 'import_page.dart';
 import 'item_search_page.dart';
-import 'login_page.dart' show kStoxVersao, LoginPage;
+import 'log_page.dart';
+import 'login_page.dart';
 
 /// Painel principal do STOX.
 ///
-/// Exibe as contagens offline pendentes, histórico de envios com
-/// status visuais, ações rápidas em grid, permite sincronizar com
-/// o SAP Business One e navega para as demais telas via Drawer.
+/// Exibe as contagens offline pendentes, ações rápidas em grid,
+/// permite sincronizar com o SAP Business One e navega para as
+/// demais telas via Drawer.
 ///
 /// Responsabilidades:
 /// - Monitorar conectividade de rede em tempo real
 /// - Listar contagens pendentes do SQLite
 /// - Sincronizar com SAP (POST para simples, PATCH para múltiplo)
 ///   com rastreabilidade por grupo (evita duplicação)
-/// - Exibir histórico de envios com indicadores visuais
+/// - Registrar eventos no log do sistema
 /// - Interpretar erros SAP com mensagens amigáveis
 /// - Exportar relatório CSV
-/// - Navegação via Drawer (contagem simples, equipe, importação)
+/// - Navegação via Drawer (contagem simples, equipe, importação, log)
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -41,7 +42,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _contagens = [];
-  List<Map<String, dynamic>> _envios = [];
   bool _iniciando = true;
   bool _carregando = false;
   String _nomeOperador = 'Operador...';
@@ -97,11 +97,10 @@ class _HomePageState extends State<HomePage> {
 
   // ── Dados iniciais ────────────────────────────────────────────────────────
 
-  /// Carrega contagens, histórico, usuário e status SAP em paralelo.
+  /// Carrega contagens, usuário e status SAP em paralelo.
   Future<void> _carregarDadosIniciais() async {
     await Future.wait([
       _carregarContagens(),
-      _carregarHistorico(),
       _carregarUsuario(),
       _verificarConexaoSap(),
     ]);
@@ -124,13 +123,6 @@ class _HomePageState extends State<HomePage> {
       _contagens = dados;
       _iniciando = false;
     });
-  }
-
-  /// Busca o histórico recente de envios (últimos 20).
-  Future<void> _carregarHistorico() async {
-    final envios = await DatabaseHelper.instance.buscarEnvios(limite: 20);
-    if (!mounted) return;
-    setState(() => _envios = envios);
   }
 
   /// Verifica localmente se há sessão SAP ativa (sem request de rede).
@@ -256,14 +248,6 @@ class _HomePageState extends State<HomePage> {
 
   // ── Sincronização ─────────────────────────────────────────────────────────
 
-  /// Converte o código do modo de contagem para label legível.
-  static String _labelModo(String? modo) => switch (modo) {
-        'single' => 'Simples (Livre)',
-        'single_doc' => 'Simples (Documento)',
-        'multiple' => 'Equipe',
-        _ => 'Desconhecido',
-      };
-
   /// Sincroniza as contagens pendentes com o SAP Business One.
   ///
   /// Cada grupo (single / single_doc / multiple) é sincronizado de forma
@@ -271,8 +255,7 @@ class _HomePageState extends State<HomePage> {
   /// Para cada grupo, cria um registro de `envio` no SQLite com o resultado
   /// e vincula as contagens ao envio correspondente.
   ///
-  /// Isso evita o bug de duplicação onde um POST bem-sucedido era
-  /// reenviado porque um PATCH subsequente falhava e impedia a limpeza.
+  /// Todos os eventos são registrados no log do sistema para auditoria.
   Future<void> _sincronizarComSAP() async {
     if (_contagens.isEmpty) return;
     if (_semInternet) {
@@ -282,9 +265,14 @@ class _HomePageState extends State<HomePage> {
     HapticFeedback.lightImpact();
     setState(() => _carregando = true);
 
-    try {
-      final db = DatabaseHelper.instance;
+    final db = DatabaseHelper.instance;
+    await db.logInfo(
+      'sync',
+      'Sincronização iniciada',
+      mensagem: '${_contagens.length} contagem(ns) pendente(s).',
+    );
 
+    try {
       // Separa contagens por modo
       final livres = _contagens
           .where((c) => c['countingMode'] == 'single')
@@ -312,10 +300,22 @@ class _HomePageState extends State<HomePage> {
         if (erro == null) {
           await db.finalizarEnvio(envioId, status: 1);
           await db.vincularContagensAoEnvio(ids, envioId, 1);
+          await db.logSucesso(
+            'sync',
+            'POST concluído',
+            mensagem:
+                '${livres.length} item(ns) enviado(s) como novo documento.',
+          );
           sucessos++;
         } else {
           await db.finalizarEnvio(envioId, status: 2, mensagemErro: erro);
           await db.vincularContagensAoEnvio(ids, envioId, 2);
+          await db.logErro(
+            'sync',
+            'Falha no POST',
+            mensagem: '${livres.length} item(ns) — modo Simples (Livre).',
+            detalhes: erro,
+          );
           ultimoErro = erro;
           falhas++;
         }
@@ -336,10 +336,16 @@ class _HomePageState extends State<HomePage> {
         final ids = simplesDoc.map((c) => c['id'] as int).toList();
 
         if (docEntry == null) {
-          const erro = 'Documento não identificado. '
+          const erro =
+              'Documento não identificado. '
               'Selecione um documento de contagem simples no menu.';
           await db.finalizarEnvio(envioId, status: 2, mensagemErro: erro);
           await db.vincularContagensAoEnvio(ids, envioId, 2);
+          await db.logAviso(
+            'sync',
+            'Documento não selecionado',
+            mensagem: erro,
+          );
           ultimoErro = erro;
           falhas++;
         } else {
@@ -350,10 +356,21 @@ class _HomePageState extends State<HomePage> {
           if (erro == null) {
             await db.finalizarEnvio(envioId, status: 1);
             await db.vincularContagensAoEnvio(ids, envioId, 1);
+            await db.logSucesso(
+              'sync',
+              'PATCH simples concluído',
+              mensagem: '${simplesDoc.length} item(ns) no Doc #$docNumber.',
+            );
             sucessos++;
           } else {
             await db.finalizarEnvio(envioId, status: 2, mensagemErro: erro);
             await db.vincularContagensAoEnvio(ids, envioId, 2);
+            await db.logErro(
+              'sync',
+              'Falha no PATCH simples',
+              mensagem: '${simplesDoc.length} item(ns) — Doc #$docNumber.',
+              detalhes: erro,
+            );
             ultimoErro = erro;
             falhas++;
           }
@@ -376,17 +393,25 @@ class _HomePageState extends State<HomePage> {
         final ids = multiplos.map((c) => c['id'] as int).toList();
 
         if (docEntry == null) {
-          const erro = 'Documento não identificado. '
+          const erro =
+              'Documento não identificado. '
               'Selecione um documento de contagem em equipe no menu.';
           await db.finalizarEnvio(envioId, status: 2, mensagemErro: erro);
           await db.vincularContagensAoEnvio(ids, envioId, 2);
+          await db.logAviso(
+            'sync',
+            'Documento não selecionado',
+            mensagem: erro,
+          );
           ultimoErro = erro;
           falhas++;
         } else if (counterID == null) {
-          const erro = 'Seu contador (InternalKey) não foi identificado. '
+          const erro =
+              'Seu contador (InternalKey) não foi identificado. '
               'Faça logout e login novamente para resolver.';
           await db.finalizarEnvio(envioId, status: 2, mensagemErro: erro);
           await db.vincularContagensAoEnvio(ids, envioId, 2);
+          await db.logAviso('sync', 'CounterID não encontrado', mensagem: erro);
           ultimoErro = erro;
           falhas++;
         } else {
@@ -398,10 +423,23 @@ class _HomePageState extends State<HomePage> {
           if (erro == null) {
             await db.finalizarEnvio(envioId, status: 1);
             await db.vincularContagensAoEnvio(ids, envioId, 1);
+            await db.logSucesso(
+              'sync',
+              'PATCH múltiplo concluído',
+              mensagem:
+                  '${multiplos.length} item(ns) — Doc #$docNumber '
+                  '— Contador #$counterID.',
+            );
             sucessos++;
           } else {
             await db.finalizarEnvio(envioId, status: 2, mensagemErro: erro);
             await db.vincularContagensAoEnvio(ids, envioId, 2);
+            await db.logErro(
+              'sync',
+              'Falha no PATCH múltiplo',
+              mensagem: '${multiplos.length} item(ns) — Doc #$docNumber.',
+              detalhes: erro,
+            );
             ultimoErro = erro;
             falhas++;
           }
@@ -411,7 +449,6 @@ class _HomePageState extends State<HomePage> {
       // ── 4. Limpar contagens sincronizadas e recarregar ──
       await db.limparContagensSincronizadas();
       await _carregarContagens();
-      await _carregarHistorico();
       if (!mounted) return;
 
       if (falhas == 0) {
@@ -419,7 +456,11 @@ class _HomePageState extends State<HomePage> {
         if (!mounted) return;
         StoxSnackbar.sucesso(context, 'Sincronização concluída com sucesso!');
       } else if (sucessos > 0) {
-        // Parcial: alguns grupos ok, outros falharam
+        await db.logAviso(
+          'sync',
+          'Sincronização parcial',
+          mensagem: '$sucessos grupo(s) ok, $falhas com erro.',
+        );
         await StoxAudio.play('sounds/error_beep.mp3', isError: true);
         if (!mounted) return;
         StoxSnackbar.aviso(
@@ -433,6 +474,12 @@ class _HomePageState extends State<HomePage> {
         _exibirErroSap(ultimoErro!);
       }
     } catch (e) {
+      await db.logErro(
+        'sync',
+        'Falha de comunicação',
+        mensagem: 'Exceção durante a sincronização.',
+        detalhes: '$e',
+      );
       await StoxAudio.play('sounds/fail.mp3', isFail: true);
       if (!mounted) return;
       StoxSnackbar.erro(
@@ -447,14 +494,6 @@ class _HomePageState extends State<HomePage> {
   // ── Interpretação de erros SAP ────────────────────────────────────────────
 
   /// Analisa a mensagem de erro bruta do SAP e retorna um [_ErroSap] amigável.
-  ///
-  /// Usa um sistema de pontuação para identificar o tipo mais provável:
-  /// - Contagem já aberta (código -1310 / 1470000497)
-  /// - Sessão expirada (401 / UNAUTHORIZED)
-  /// - Falha de rede (TIMEOUT / CONNECTION / SOCKET)
-  /// - Item não encontrado (código -4002)
-  /// - Depósito inválido (código -5002)
-  /// - Erro genérico (fallback)
   _ErroSap _interpretarErroSap(String mensagemBruta) {
     final msg = mensagemBruta.toUpperCase();
     final tecnico = mensagemBruta.length > 300
@@ -552,7 +591,6 @@ class _HomePageState extends State<HomePage> {
     }
     if (msg.contains('WAREHOUSE') && pontoDeposito == 0) pontoDeposito += 1;
 
-    // ── Item não encontrado ──
     if (pontoItem > pontoDeposito && pontoItem > 0) {
       return _ErroSap(
         icone: Icons.inventory_2_rounded,
@@ -570,7 +608,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // ── Depósito inválido ──
     if (pontoDeposito > pontoItem && pontoDeposito > 1) {
       return _ErroSap(
         icone: Icons.warning_amber_rounded,
@@ -588,7 +625,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // ── Erro genérico (fallback) ──
     return _ErroSap(
       icone: Icons.error_outline_rounded,
       cor: Colors.red.shade700,
@@ -648,8 +684,6 @@ class _HomePageState extends State<HomePage> {
                 style: const TextStyle(fontSize: 14, height: 1.5),
               ),
               const SizedBox(height: 16),
-
-              // ── Card de orientação ──
               StoxCard(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -674,8 +708,6 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-
-              // ── Retorno técnico SAP (selecionável) ──
               if (erro.codigoTecnico != null) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -761,7 +793,6 @@ class _HomePageState extends State<HomePage> {
         ),
         elevation: 0,
         actions: [
-          // ── Indicador SAP na barra de título ──
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: _buildAppBarStatusChip(),
@@ -796,20 +827,12 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     _buildQuickActions(),
                     const SizedBox(height: 24),
-                    if (_contagens.isEmpty && _envios.isEmpty)
+                    if (_contagens.isEmpty)
                       _buildEmptyState()
                     else ...[
-                      if (_contagens.isNotEmpty) ...[
-                        _buildContagensHeader(),
-                        const SizedBox(height: 12),
-                        ..._contagens.map(_buildItemContagem),
-                      ],
-                      if (_envios.isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _buildHistoricoHeader(),
-                        const SizedBox(height: 12),
-                        ..._envios.map(_buildItemEnvio),
-                      ],
+                      _buildContagensHeader(),
+                      const SizedBox(height: 12),
+                      ..._contagens.map(_buildItemContagem),
                     ],
                   ],
                 ),
@@ -863,7 +886,6 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Linha 1: Contagem Simples + Contagem em Equipe ──
         Row(
           children: [
             Expanded(
@@ -909,8 +931,6 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         const SizedBox(height: 10),
-
-        // ── Linha 2: Pesquisar + Importar CSV ──
         Row(
           children: [
             Expanded(
@@ -996,7 +1016,6 @@ class _HomePageState extends State<HomePage> {
 
   // ── Indicador SAP na AppBar ─────────────────────────────────────────────
 
-  /// Chip compacto de status de conexão exibido na barra de título.
   Widget _buildAppBarStatusChip() {
     final Color cor;
     final IconData icone;
@@ -1043,7 +1062,6 @@ class _HomePageState extends State<HomePage> {
 
   // ── Lista de contagens ────────────────────────────────────────────────────
 
-  /// Cabeçalho da seção de contagens pendentes.
   Widget _buildContagensHeader() {
     return Row(
       children: [
@@ -1159,175 +1177,6 @@ class _HomePageState extends State<HomePage> {
     ),
   );
 
-  // ── Histórico de envios ───────────────────────────────────────────────────
-
-  Widget _buildHistoricoHeader() => Row(
-    children: [
-      Icon(Icons.send_rounded, color: Colors.grey.shade500, size: 20),
-      const SizedBox(width: 8),
-      Text(
-        'Histórico de Envios',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 15,
-          color: Colors.grey.shade800,
-        ),
-      ),
-      const Spacer(),
-      Text(
-        '${_envios.length} envio${_envios.length != 1 ? 's' : ''}',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-      ),
-    ],
-  );
-
-  Widget _buildItemEnvio(Map<String, dynamic> envio) {
-    final status = envio['status'] as int? ?? 0;
-    final modo = envio['modo'] as String? ?? 'single';
-    final totalItens = envio['totalItens'] as int? ?? 0;
-    final docEntry = envio['docEntry'] as int?;
-    final mensagemErro = envio['mensagemErro'] as String?;
-    final dataEnvio = envio['dataEnvio'] as String? ?? '';
-
-    // ── Indicador visual por status ──
-    final Color corStatus;
-    final IconData iconeStatus;
-    final String labelStatus;
-
-    switch (status) {
-      case 1:
-        corStatus = Colors.green.shade600;
-        iconeStatus = Icons.check_circle_rounded;
-        labelStatus = 'Sucesso';
-      case 2:
-        corStatus = Colors.red.shade600;
-        iconeStatus = Icons.error_rounded;
-        labelStatus = 'Erro';
-      default:
-        corStatus = Colors.orange.shade600;
-        iconeStatus = Icons.schedule_rounded;
-        labelStatus = 'Pendente';
-    }
-
-    // ── Data formatada ──
-    String dataFormatada = '';
-    try {
-      final dt = DateTime.parse(dataEnvio);
-      dataFormatada =
-          '${dt.day.toString().padLeft(2, '0')}/'
-          '${dt.month.toString().padLeft(2, '0')} '
-          '${dt.hour.toString().padLeft(2, '0')}:'
-          '${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      dataFormatada = dataEnvio;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: StoxCard(
-        borderColor: corStatus.withAlpha(60),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: status == 2 && mensagemErro != null
-              ? () => _exibirErroSap(mensagemErro)
-              : null,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                // ── Indicador de status ──
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: corStatus.withAlpha(20),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(iconeStatus, color: corStatus, size: 22),
-                ),
-                const SizedBox(width: 14),
-
-                // ── Detalhes ──
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            _labelModo(modo),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (docEntry != null) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              '#$docEntry',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$totalItens ${totalItens == 1 ? 'item' : 'itens'}'
-                        '  •  $dataFormatada',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      if (status == 2 && mensagemErro != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          mensagemErro.length > 80
-                              ? '${mensagemErro.substring(0, 80)}...'
-                              : mensagemErro,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.red.shade600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // ── Badge de status ──
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: corStatus.withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    labelStatus,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: corStatus,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   // ── Bottom sheet de documentos ─────────────────────────────────────────────
 
   Widget _buildDocumentosSheet(
@@ -1353,7 +1202,6 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Handle ──
           const SizedBox(height: 12),
           Container(
             width: 48,
@@ -1363,8 +1211,6 @@ class _HomePageState extends State<HomePage> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-
-          // ── Cabeçalho ──
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
             child: Row(
@@ -1398,14 +1244,9 @@ class _HomePageState extends State<HomePage> {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ),
-
-          // ── Botão extra (ex: "Contagem Livre" no modo simples) ──
           if (acaoExtra != null)
             Padding(padding: const EdgeInsets.only(top: 8), child: acaoExtra),
-
           const SizedBox(height: 16),
-
-          // ── Lista de documentos ──
           if (_carregandoDocs)
             const Padding(
               padding: EdgeInsets.all(32),
@@ -1445,15 +1286,12 @@ class _HomePageState extends State<HomePage> {
         onTap: () async {
           HapticFeedback.selectionClick();
           Navigator.pop(sheetCtx);
-
-          // Salva dados do documento selecionado
           final prefs = await SharedPreferences.getInstance();
           await Future.wait([
             prefs.setInt('selected_doc_entry', docEntry),
             prefs.setInt('selected_doc_number', docNum is int ? docNum : 0),
             prefs.setString('selected_doc_type', tipo),
           ]);
-
           if (!mounted) return;
           Navigator.push(
             context,
@@ -1466,7 +1304,6 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header do card ──
               Row(
                 children: [
                   Icon(
@@ -1510,8 +1347,6 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 8),
-
-              // ── Detalhes ──
               Text(
                 'Data: $countDate',
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
@@ -1538,8 +1373,6 @@ class _HomePageState extends State<HomePage> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-
-              // ── CTA ──
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1573,7 +1406,6 @@ class _HomePageState extends State<HomePage> {
     return Drawer(
       child: Column(
         children: [
-          // ── Header do Drawer ──
           UserAccountsDrawerHeader(
             decoration: BoxDecoration(color: theme.primaryColor),
             currentAccountPicture: const CircleAvatar(
@@ -1610,8 +1442,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-
-          // ── Menu principal ──
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
@@ -1632,7 +1462,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   onTap: () {
                     HapticFeedback.selectionClick();
-                    Navigator.pop(context); // fecha drawer
+                    Navigator.pop(context);
                     if (_sapConectado && !_semInternet) {
                       _mostrarDocumentosSimples();
                     } else {
@@ -1680,7 +1510,7 @@ class _HomePageState extends State<HomePage> {
                   enabled: _sapConectado && !_semInternet,
                   onTap: () {
                     HapticFeedback.selectionClick();
-                    Navigator.pop(context); // fecha drawer
+                    Navigator.pop(context);
                     _mostrarDocumentosMultiplos();
                   },
                 ),
@@ -1709,8 +1539,6 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
 
-                _buildDrawerDivider(),
-
                 // ── Pesquisar Item ──
                 ListTile(
                   leading: Icon(
@@ -1731,7 +1559,29 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
 
-                _buildDrawerDivider(),
+                // ── Log do Sistema ──
+                ListTile(
+                  leading: Icon(
+                    Icons.receipt_long_rounded,
+                    color: Colors.blueGrey.shade600,
+                  ),
+                  title: const Text(
+                    'Log do Sistema',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    'Histórico de atividades e envios',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      StoxApp.transicaoPadrao(const LogPage()),
+                    );
+                  },
+                ),
 
                 // ── Configurações ──
                 ListTile(
@@ -1760,35 +1610,33 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // ── Rodapé do Drawer ──
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded, color: Colors.red),
-            title: const Text(
-              'Sair da Conta',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-            onTap: () async {
-              HapticFeedback.heavyImpact();
-              await SapService.logout();
-              if (!mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                StoxApp.transicaoPadrao(const LoginPage()),
-                (r) => false,
-              );
-            },
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              24 + MediaQuery.of(context).viewPadding.bottom,
-            ),
-            child: Text(
-              kStoxVersao,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+          _buildDrawerDivider(),
+          SafeArea(
+            top: false,
+            child: ListTile(
+              leading: const Icon(Icons.logout_rounded, color: Colors.red),
+              title: const Text(
+                'Sair da Conta',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onTap: () async {
+                HapticFeedback.heavyImpact();
+                await SapService.logout();
+                await DatabaseHelper.instance.logInfo(
+                  'auth',
+                  'Logout realizado',
+                  mensagem: 'Operador: $_nomeOperador.',
+                );
+                if (!mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  StoxApp.transicaoPadrao(const LoginPage()),
+                  (r) => false,
+                );
+              },
             ),
           ),
         ],
@@ -1805,27 +1653,12 @@ class _HomePageState extends State<HomePage> {
 
 // ── Modelo de erro amigável ─────────────────────────────────────────────────
 
-/// Dados de um erro SAP interpretado para exibição amigável ao operador.
-///
-/// Usado por [_HomePageState._interpretarErroSap] para transformar
-/// mensagens técnicas do SAP em feedback compreensível.
 class _ErroSap {
-  /// Ícone ilustrativo do tipo de erro.
   final IconData icone;
-
-  /// Cor do ícone e do botão de ação.
   final Color cor;
-
-  /// Título curto e descritivo (ex: "Sessão expirada").
   final String titulo;
-
-  /// Explicação do erro em linguagem simples.
   final String mensagem;
-
-  /// Instruções de como resolver o problema.
   final String orientacao;
-
-  /// Mensagem técnica original do SAP (exibida em `SelectableText`).
   final String? codigoTecnico;
 
   const _ErroSap({
