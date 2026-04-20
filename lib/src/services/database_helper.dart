@@ -409,6 +409,30 @@ class DatabaseHelper {
     ''');
   }
 
+  /// Detecta o fluxo ativo baseado nas contagens pendentes (syncStatus 0 ou 2).
+  ///
+  /// Retorna `'simples'` se há pendentes com modo `single` ou `single_doc`.
+  /// Retorna `'equipe'` se há pendentes com modo `multiple`.
+  /// Retorna `null` se não há contagens pendentes (livre para qualquer fluxo).
+  ///
+  /// Regra de negócio: a contagem só pode ser feita de um tipo por vez.
+  Future<String?> buscarFluxoAtivo() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT DISTINCT countingMode
+      FROM contagens
+      WHERE syncStatus IN (0, 2)
+    ''');
+    if (result.isEmpty) return null;
+
+    final modos = result.map((r) => r['countingMode'] as String?).toSet();
+    if (modos.contains('multiple')) return 'equipe';
+    if (modos.contains('single') || modos.contains('single_doc')) {
+      return 'simples';
+    }
+    return null;
+  }
+
   /// Calcula a soma total de quantidade para um [itemCode] específico.
   Future<double> calcularTotalPorItem(String itemCode) async {
     final db = await database;

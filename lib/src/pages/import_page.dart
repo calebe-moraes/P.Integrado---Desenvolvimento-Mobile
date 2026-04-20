@@ -86,9 +86,18 @@ class _ImportPageState extends State<ImportPage> {
         setState(
           () => _erro = 'Nenhum item válido encontrado no arquivo.',
         );
+        await DatabaseHelper.instance.logAviso('import', 'CSV sem itens',
+            mensagem: 'Arquivo "${file.name}" não contém itens válidos.');
+      } else {
+        await DatabaseHelper.instance.logInfo('import', 'CSV carregado',
+            mensagem:
+                '${itens.length} item(ns) lido(s) de "${file.name}".');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('ImportPage._selecionarArquivo: $e');
+      DatabaseHelper.instance.logErro('import', 'Erro ao ler arquivo',
+          mensagem: 'Falha ao processar "$_nomeArquivo".',
+          detalhes: '$e');
       if (!mounted) return;
       setState(() {
         _carregando = false;
@@ -276,10 +285,18 @@ class _ImportPageState extends State<ImportPage> {
         'com sucesso!',
       );
 
+      await DatabaseHelper.instance.logSucesso('import', 'Importação concluída',
+          mensagem:
+              '$importados item(ns) importado(s) de "$_nomeArquivo".');
+
+      if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
       await StoxAudio.play('sounds/fail.mp3', isFail: true);
       if (kDebugMode) debugPrint('ImportPage._importarContagens: $e');
+      await DatabaseHelper.instance.logErro('import', 'Falha na importação',
+          mensagem: 'Erro ao importar "$_nomeArquivo".',
+          detalhes: '$e');
       if (!mounted) return;
       setState(() {
         _carregando = false;
