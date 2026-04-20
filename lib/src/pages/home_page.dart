@@ -1629,6 +1629,12 @@ class _HomePageState extends State<HomePage> {
               onTap: () async {
                 HapticFeedback.heavyImpact();
                 await SapService.logout();
+                final prefs = await SharedPreferences.getInstance();
+                await Future.wait([
+                  prefs.remove('selected_doc_entry'),
+                  prefs.remove('selected_doc_number'),
+                  prefs.remove('selected_doc_type'),
+                ]);
                 await DatabaseHelper.instance.logInfo(
                   'auth',
                   'Logout realizado',

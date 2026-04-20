@@ -65,6 +65,9 @@ Future<void> main() async {
     prefs.remove('B1SESSION'),
     prefs.remove('ROUTEID'),
     prefs.remove('UserName'),
+    prefs.remove('selected_doc_entry'),
+    prefs.remove('selected_doc_number'),
+    prefs.remove('selected_doc_type'),
   ]);
 
   // ── SSL ────────────────────────────────────────────────────────────────────

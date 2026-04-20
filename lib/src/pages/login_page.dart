@@ -199,7 +199,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
 
               Text(
-                'STOX v1.0.0 — Grupo JCN',
+                'STOX v1.0.0 - Grupo JCN',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
