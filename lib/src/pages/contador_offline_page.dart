@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/database_helper.dart';
@@ -363,6 +366,196 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
       if (!mounted) return;
       StoxSnackbar.erro(context, 'Erro ao exportar: $e');
     }
+  }
+
+  /// Gera um PDF A4 com a listagem de contagens e abre o diálogo de impressão.
+  Future<void> _imprimirRelatorio() async {
+    HapticFeedback.lightImpact();
+    if (_contagens.isEmpty) {
+      await StoxAudio.play('sounds/error_beep.mp3', isError: true);
+      if (!mounted) return;
+      StoxSnackbar.aviso(context, 'Nenhuma contagem para imprimir!');
+      return;
+    }
+
+    try {
+      final agora = DateTime.now();
+      final dataFormatada =
+          '${agora.day.toString().padLeft(2, '0')}/'
+          '${agora.month.toString().padLeft(2, '0')}/'
+          '${agora.year} '
+          '${agora.hour.toString().padLeft(2, '0')}:'
+          '${agora.minute.toString().padLeft(2, '0')}';
+
+      final modoLabel = _isMultiplo
+          ? 'Contagem em Equipe — Doc #${_docNumber ?? _docEntry}'
+          : _isSimpleDoc
+              ? 'Contagem Simples — Doc #${_docNumber ?? _docEntry}'
+              : 'Contagem Offline';
+
+      final pdf = pw.Document();
+
+      // Quantidade total
+      final qtdTotal = _contagens.fold<double>(
+        0.0,
+        (soma, c) => soma + ((c['quantidade'] as num?)?.toDouble() ?? 0),
+      );
+
+      // Depósitos distintos
+      final depositos = _contagens
+          .map((c) => c['warehouseCode']?.toString() ?? '01')
+          .toSet();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          header: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'STOX - Relatório de Contagem',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    dataFormatada,
+                    style: const pw.TextStyle(
+                      fontSize: 10,
+                      color: PdfColors.grey600,
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                modoLabel,
+                style: const pw.TextStyle(
+                  fontSize: 11,
+                  color: PdfColors.grey700,
+                ),
+              ),
+              if (_isMultiplo && _counterName != null)
+                pw.Text(
+                  'Contador: $_counterName',
+                  style: const pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColors.grey600,
+                  ),
+                ),
+              pw.SizedBox(height: 6),
+              pw.Row(
+                children: [
+                  _pdfChip('${_contagens.length} itens'),
+                  pw.SizedBox(width: 12),
+                  _pdfChip(
+                    'Qtd total: ${qtdTotal % 1 == 0 ? qtdTotal.toInt() : qtdTotal.toStringAsFixed(1)}',
+                  ),
+                  pw.SizedBox(width: 12),
+                  _pdfChip('${depositos.length} depósito(s)'),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 0.5),
+            ],
+          ),
+          footer: (context) => pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'STOX v1.0.0 - Grupo JCN',
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey500,
+                ),
+              ),
+              pw.Text(
+                'Página ${context.pageNumber} de ${context.pagesCount}',
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey500,
+                ),
+              ),
+            ],
+          ),
+          build: (context) => [
+            pw.TableHelper.fromTextArray(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              headerStyle: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFF1B4FA8),
+              ),
+              headerAlignment: pw.Alignment.centerLeft,
+              headerPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              cellStyle: const pw.TextStyle(fontSize: 10),
+              cellPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 5,
+              ),
+              cellAlignment: pw.Alignment.centerLeft,
+              headers: [
+                '#',
+                'Código do Item',
+                'Depósito',
+                'Quantidade',
+                if (_isMultiplo) 'Contador',
+              ],
+              data: List.generate(_contagens.length, (i) {
+                final c = _contagens[i];
+                final qtd = c['quantidade'];
+                final qtdStr = qtd is double && qtd % 1 == 0
+                    ? qtd.toInt().toString()
+                    : qtd.toString();
+                return [
+                  '${i + 1}',
+                  c['itemCode']?.toString() ?? '',
+                  c['warehouseCode']?.toString() ?? '01',
+                  qtdStr,
+                  if (_isMultiplo) c['counterName']?.toString() ?? '',
+                ];
+              }),
+            ),
+          ],
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (_) => pdf.save(),
+        name: 'Relatorio_STOX_${agora.millisecondsSinceEpoch}',
+        format: PdfPageFormat.a4,
+      );
+    } catch (e) {
+      await StoxAudio.play('sounds/fail.mp3', isFail: true);
+      if (!mounted) return;
+      StoxSnackbar.erro(context, 'Erro ao imprimir: $e');
+    }
+  }
+
+  /// Chip de texto para o cabeçalho do PDF.
+  static pw.Widget _pdfChip(String label) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey200,
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Text(
+        label,
+        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+      ),
+    );
   }
 
   Future<void> _escanearComIA() async {
@@ -755,6 +948,11 @@ class _ContadorOfflinePageState extends State<ContadorOfflinePage> {
                   color: Colors.orange.shade700),
               onPressed: _sairModoEquipe,
             ),
+          IconButton(
+            tooltip: 'Imprimir A4',
+            icon: const Icon(Icons.print_rounded),
+            onPressed: _imprimirRelatorio,
+          ),
           IconButton(
             tooltip: 'Exportar CSV',
             icon: const Icon(Icons.share_rounded),
