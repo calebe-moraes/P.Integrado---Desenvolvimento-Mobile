@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_stox.dart';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Permite certificados SSL auto-assinados quando habilitado pelo usuário.
 ///
 /// Necessário em ambientes SAP on-premises onde o Service Layer
@@ -65,9 +67,6 @@ Future<void> main() async {
     prefs.remove('B1SESSION'),
     prefs.remove('ROUTEID'),
     prefs.remove('UserName'),
-    prefs.remove('selected_doc_entry'),
-    prefs.remove('selected_doc_number'),
-    prefs.remove('selected_doc_type'),
   ]);
 
   // ── SSL ────────────────────────────────────────────────────────────────────
@@ -82,6 +81,8 @@ Future<void> main() async {
     systemNavigationBarColor: Colors.white,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
+  
+  await dotenv.load(fileName: "assets/.env");
 
   runApp(const StoxApp());
 }
