@@ -242,12 +242,6 @@ class SapService {
         (prefs.getString('B1SESSION') ?? '').isNotEmpty;
   }
 
-  /// Busca itens no SAP por código ou nome usando `contains`.
-  ///
-  /// Filtro OData: `contains(ItemCode,'termo') or contains(ItemName,'termo')`
-  /// Seleciona `ItemCode`, `ItemName` e `Frozen` (usado para filtro de status).
-  /// Usa `Prefer: odata.maxpagesize=0` para retornar todos os resultados
-  /// que casam com o filtro (sem paginação).
   static Future<List<dynamic>> searchItems(String termo) async {
     final ctx = await _obterContexto();
     if (ctx == null) return [];
@@ -258,18 +252,12 @@ class SapService {
       final t = termo.replaceAll("'", "''");
       final uri = Uri.parse(
         '${ctx.baseUrl}Items?'
-        '\$select=ItemCode,ItemName,Frozen&'
+        '\$select=ItemCode,ItemName&'
         "\$filter=contains(ItemCode,'$t') or contains(ItemName,'$t')",
       );
 
       final response = await client
-          .get(
-            uri,
-            headers: {
-              ..._headersGet(ctx),
-              'Prefer': 'odata.maxpagesize=0',
-            },
-          )
+          .get(uri, headers: _headersGet(ctx))
           .timeout(_timeoutLeitura);
 
       if (response.statusCode == 200) {
@@ -283,7 +271,41 @@ class SapService {
     }
     return [];
   }
+  /// Busca itens retornando também a quantidade em estoque (QuantityOnStock)
+  static Future<List<dynamic>> consultarEstoqueItem(String termo) async {
+    final ctx = await _obterContexto();
+    if (ctx == null) return [];
 
+    http.Client? client;
+    try {
+      client = await _getClient();
+      final t = termo.replaceAll("'", "''"); // Evita quebra de SQL Injection
+      
+      final uri = Uri.parse(
+        '${ctx.baseUrl}Items?'
+        '\$select=ItemCode,ItemName,QuantityOnStock,Frozen&'
+        '\$filter=contains(ItemCode,\'$t\') or contains(ItemName,\'$t\')'
+      );
+
+      final response = await client.get(
+        uri,
+        headers: {..._headersGet(ctx)},
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        return json['value'] ?? [];
+      } else {
+        print("Erro SAP: ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      print('Erro na consulta de estoque: $e');
+      return [];
+    } finally {
+      client?.close();
+    }
+  }
   static Future<List<dynamic>> buscarUsuariosSap() async {
     final ctx = await _obterContexto();
     if (ctx == null) return [];
@@ -311,9 +333,6 @@ class SapService {
     return [];
   }
 
-  /// Busca detalhes completos de um item pelo código.
-  ///
-  /// Inclui campos extras: `User_Text`, `SupplierCatalogNo`, `CreateDate`.
   static Future<Map<String, dynamic>?> getDetailedItem(
     String itemCode,
   ) async {
@@ -336,7 +355,6 @@ class SapService {
           'QuantityOnStock,QuantityOrderedFromVendors,'
           'QuantityOrderedByCustomers,'
           'Mainsupplier,Manufacturer,'
-          'User_Text,SupplierCatalogNo,CreateDate,'
           'ItemWarehouseInfoCollection,ItemPreferredVendors,ItemPrices';
 
       final uri = Uri.parse(
